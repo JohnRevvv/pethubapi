@@ -8,6 +8,7 @@ import (
 	"pethub_api/models"
 
 	"github.com/gofiber/fiber/v2"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -48,10 +49,18 @@ func RegisterAdopter(c *fiber.Ctx) error {
 		})
 	}
 
+	// Hash the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(requestBody.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to hash password",
+		})
+	}
+
 	// Create adopter account
 	adopterAccount := models.AdopterAccount{
 		Username:  requestBody.Username,
-		Password:  requestBody.Password, // Hash the password before storing it
+		Password:  string(hashedPassword), // Store hashed password
 		CreatedAt: time.Now(),
 	}
 
@@ -64,7 +73,7 @@ func RegisterAdopter(c *fiber.Ctx) error {
 
 	// Create adopter info
 	adopterInfo := models.AdopterInfo{
-		AdopterID:     adopterAccount.AdopterID, // Link the AdopterInfo to AdopterAccount
+		AdopterID:     adopterAccount.AdopterID,
 		FirstName:     requestBody.FirstName,
 		LastName:      requestBody.LastName,
 		Age:           requestBody.Age,
@@ -93,7 +102,12 @@ func RegisterAdopter(c *fiber.Ctx) error {
 	})
 }
 
+// ==============================================================
+
 // LoginAdopter authenticates an adopter and retrieves their info
+
+// ==============================================================
+
 func LoginAdopter(c *fiber.Ctx) error {
 	// Parse request body
 	requestBody := struct {
@@ -141,6 +155,84 @@ func LoginAdopter(c *fiber.Ctx) error {
 	// Login successful, return adopter account and info
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Login successful",
+		"data": fiber.Map{
+			"adopter": adopterAccount,
+			"info":    adopterInfo,
+		},
+	})
+}
+
+func GetAllAdopters(c *fiber.Ctx) error {
+	// Fetch all adopter accounts
+	var adopterAccounts []models.AdopterAccount
+	accountResult := middleware.DBConn.Find(&adopterAccounts)
+
+	if accountResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to fetch adopter accounts",
+		})
+	}
+
+	// Fetch all adopter info
+	var adopterInfos []models.AdopterInfo
+	infoResult := middleware.DBConn.Find(&adopterInfos)
+
+	if infoResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to fetch adopter info",
+		})
+	}
+
+	// Combine accounts and info into a single response
+	adopters := []fiber.Map{}
+	for _, account := range adopterAccounts {
+		for _, info := range adopterInfos {
+			if account.AdopterID == info.AdopterID {
+				adopters = append(adopters, fiber.Map{
+					"adopter": account,
+					"info":    info,
+				})
+				break
+			}
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Adopters retrieved successfully",
+		"data":    adopters,
+	})
+}
+
+func GetAdopterByID(c *fiber.Ctx) error {
+	adopterID := c.Params("id")
+
+	// Fetch adopter account
+	var adopterAccount models.AdopterAccount
+	accountResult := middleware.DBConn.Where("adopter_id = ?", adopterID).First(&adopterAccount)
+
+	if errors.Is(accountResult.Error, gorm.ErrRecordNotFound) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "Adopter not found",
+		})
+	} else if accountResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Database error",
+		})
+	}
+
+	// Fetch adopter info
+	var adopterInfo models.AdopterInfo
+	infoResult := middleware.DBConn.Where("adopter_id = ?", adopterID).First(&adopterInfo)
+
+	if infoResult.Error != nil && !errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to fetch adopter info",
+		})
+	}
+
+	// Return adopter details
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Adopter details retrieved successfully",
 		"data": fiber.Map{
 			"adopter": adopterAccount,
 			"info":    adopterInfo,

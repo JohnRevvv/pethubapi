@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -42,10 +43,18 @@ func RegisterShelter(c *fiber.Ctx) error {
 		})
 	}
 
+	// Hash the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(requestBody.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to hash password",
+		})
+	}
+
 	// Create shelter account
 	ShelterAccount := models.ShelterAccount{
 		Username:  requestBody.Username,
-		Password:  requestBody.Password, // Hash the password before storing it
+		Password:  string(hashedPassword), // Store hashed password
 		CreatedAt: time.Now(),
 	}
 
@@ -58,11 +67,11 @@ func RegisterShelter(c *fiber.Ctx) error {
 
 	// Create shelter info
 	ShelterInfo := models.ShelterInfo{
-		ShelterID:     ShelterAccount.ID, // Link the ShelterInfo to ShelterAccount
-		ShelterName:     requestBody.ShelterName,
-		ShelterAddress: requestBody.ShelterAddress,
-		ShelterContact: requestBody.ShelterContact,
-		ShelterOwner: requestBody.ShelterOwner,
+		ShelterID:          ShelterAccount.ID, // Link the ShelterInfo to ShelterAccount
+		ShelterName:        requestBody.ShelterName,
+		ShelterAddress:     requestBody.ShelterAddress,
+		ShelterContact:     requestBody.ShelterContact,
+		ShelterOwner:       requestBody.ShelterOwner,
 		ShelterDescription: requestBody.ShelterDescription,
 	}
 
@@ -82,7 +91,7 @@ func RegisterShelter(c *fiber.Ctx) error {
 	})
 }
 
-//Login
+// Login
 func LoginShelter(c *fiber.Ctx) error {
 	// Parse request body
 	requestBody := struct {
@@ -133,6 +142,88 @@ func LoginShelter(c *fiber.Ctx) error {
 		"data": fiber.Map{
 			"Shelter": ShelterAccount,
 			"Info":    ShelterInfo,
+		},
+	})
+}
+
+func GetAllShelters(c *fiber.Ctx) error {
+	// Fetch all shelter accounts
+	var shelterAccounts []models.ShelterAccount
+	accountResult := middleware.DBConn.Find(&shelterAccounts)
+
+	if accountResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to fetch shelter accounts",
+		})
+	}
+
+	// Fetch all shelter info
+	var shelterInfos []models.ShelterInfo
+	infoResult := middleware.DBConn.Find(&shelterInfos)
+
+	if infoResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to fetch shelter info",
+		})
+	}
+
+	// Combine accounts and info into a single response
+	shelters := []fiber.Map{}
+	for _, account := range shelterAccounts {
+		for _, info := range shelterInfos {
+			if account.ID == info.ShelterID {
+				shelters = append(shelters, fiber.Map{
+					"shelter": account,
+					"info":    info,
+				})
+				break
+			}
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Shelters retrieved successfully",
+		"data":    shelters,
+	})
+}
+
+func GetShelterByName(c *fiber.Ctx) error {
+	shelterName := c.Query("shelter_name")
+	if shelterName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Shelter name query parameter is missing",
+		})
+	}
+
+	// Fetch shelter info by name
+	var shelterInfo models.ShelterInfo
+	infoResult := middleware.DBConn.Where("shelter_name = ?", shelterName).First(&shelterInfo)
+
+	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "Shelter not found",
+		})
+	} else if infoResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Database error",
+		})
+	}
+
+	// Fetch shelter account associated with the shelter info
+	var shelterAccount models.ShelterAccount
+	accountResult := middleware.DBConn.Where("id = ?", shelterInfo.ShelterID).First(&shelterAccount)
+
+	if accountResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to fetch shelter account",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Shelter retrieved successfully",
+		"data": fiber.Map{
+			"shelter": shelterAccount,
+			"info":    shelterInfo,
 		},
 	})
 }
