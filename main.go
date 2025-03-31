@@ -28,6 +28,16 @@ func main() {
 		AppName: middleware.GetEnv("PROJ_NAME"),
 	})
 
+	// CORS CONFIG
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "*", // Allow all origins (update for production)
+		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+	}))
+
+	// LOGGER
+	app.Use(logger.New())
+
 	// API ROUTES
 
 	// Do not remove this endpoint
@@ -36,14 +46,6 @@ func main() {
 	})
 
 	routes.AppRoutes(app)
-	// CORS CONFIG
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-		AllowHeaders: "Origin, Content-Type, Accept",
-	}))
-
-	// LOGGER
-	app.Use(logger.New())
 
 	// Start Server
 	port := middleware.GetEnv("PROJ_PORT")

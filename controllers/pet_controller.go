@@ -20,6 +20,7 @@ func AddPet(c *fiber.Ctx) error {
 	}
 
 	pet := new(models.PetInfo)
+	petMedia := new(models.PetMedia)
 
 	// Retrieve the shelter ID from the URL parameter
 	idParam := c.Params("id")
@@ -69,7 +70,30 @@ func AddPet(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(pet)
+	// Parse the request body into the petMedia struct
+	if err := c.BodyParser(petMedia); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Cannot parse media JSON",
+		})
+	}
+
+	// Set the PetID for the media to match the newly created pet
+	petMedia.PetID = pet.PetID
+
+	// Save the pet media to the database
+	if err := DB.Create(&petMedia).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to add pet media",
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "Pet and media added successfully",
+		"data": fiber.Map{
+			"pet":   pet,
+			"media": petMedia,
+		},
+	})
 }
 
 func GetAllPetsByShelterID(c *fiber.Ctx) error {

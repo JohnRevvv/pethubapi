@@ -19,9 +19,12 @@ func RegisterShelter(c *fiber.Ctx) error {
 		Password           string `json:"password"`
 		ShelterName        string `json:"shelter_name"`
 		ShelterAddress     string `json:"shelter_address"`
-		ShelterContact     int    `json:"shelter_contact"`
+		ShelterLandmark    string `json:"shelter_landmark"`
+		ShelterContact     string `json:"shelter_contact"`
+		ShelterEmail       string `json:"shelter_email"`
 		ShelterOwner       string `json:"shelter_owner"`
 		ShelterDescription string `json:"shelter_description"`
+		ShelterSocial      string `json:"shelter_social"`
 	}{}
 
 	if err := c.BodyParser(&requestBody); err != nil {
@@ -67,12 +70,15 @@ func RegisterShelter(c *fiber.Ctx) error {
 
 	// Create shelter info
 	ShelterInfo := models.ShelterInfo{
-		ShelterID:          ShelterAccount.ID, // Link the ShelterInfo to ShelterAccount
+		ShelterID:          ShelterAccount.ShelterID, // Link the ShelterInfo to ShelterAccount
 		ShelterName:        requestBody.ShelterName,
 		ShelterAddress:     requestBody.ShelterAddress,
+		ShelterLandmark:    requestBody.ShelterLandmark,
 		ShelterContact:     requestBody.ShelterContact,
+		ShelterEmail:       requestBody.ShelterEmail,
 		ShelterOwner:       requestBody.ShelterOwner,
 		ShelterDescription: requestBody.ShelterDescription,
+		ShelterSocial:      requestBody.ShelterSocial,
 	}
 
 	// Insert into Shelterinfo
@@ -119,8 +125,9 @@ func LoginShelter(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check password (assuming password is stored as plain text for now)
-	if ShelterAccount.Password != requestBody.Password {
+	// Check password using bcrypt
+	err := bcrypt.CompareHashAndPassword([]byte(ShelterAccount.Password), []byte(requestBody.Password))
+	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Invalid username or password",
 		})
@@ -128,7 +135,7 @@ func LoginShelter(c *fiber.Ctx) error {
 
 	// Fetch adopter info
 	var ShelterInfo models.ShelterInfo
-	infoResult := middleware.DBConn.Where("shelter_id = ?", ShelterAccount.ID).First(&ShelterInfo)
+	infoResult := middleware.DBConn.Where("shelter_id = ?", ShelterAccount.ShelterID).First(&ShelterInfo)
 
 	if infoResult.Error != nil && !errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -136,12 +143,13 @@ func LoginShelter(c *fiber.Ctx) error {
 		})
 	}
 
-	// Login successful, return adopter account and info
+	// Login successful, return shelter account, info, and ID
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Login successful",
 		"data": fiber.Map{
-			"Shelter": ShelterAccount,
-			"Info":    ShelterInfo,
+			"shelter_id": ShelterAccount.ShelterID, // Include shelter ID in the response
+			"Shelter":    ShelterAccount,
+			"Info":       ShelterInfo,
 		},
 	})
 }
@@ -171,7 +179,7 @@ func GetAllShelters(c *fiber.Ctx) error {
 	shelters := []fiber.Map{}
 	for _, account := range shelterAccounts {
 		for _, info := range shelterInfos {
-			if account.ID == info.ShelterID {
+			if account.ShelterID == info.ShelterID {
 				shelters = append(shelters, fiber.Map{
 					"shelter": account,
 					"info":    info,
@@ -224,6 +232,181 @@ func GetShelterByName(c *fiber.Ctx) error {
 		"data": fiber.Map{
 			"shelter": shelterAccount,
 			"info":    shelterInfo,
+		},
+	})
+}
+
+func GetShelterInfoByID(c *fiber.Ctx) error {
+	shelterID := c.Params("id")
+
+	// Fetch shelter info by ID
+	var shelterInfo models.ShelterInfo
+	infoResult := middleware.DBConn.Where("shelter_id = ?", shelterID).First(&shelterInfo)
+
+	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "Shelter info not found",
+		})
+	} else if infoResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Database error",
+		})
+	}
+
+	// Fetch shelter account associated with the shelter info
+	var shelterAccount models.ShelterAccount
+	accountResult := middleware.DBConn.Where("shelter_id = ?", shelterID).First(&shelterAccount)
+
+	if accountResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to fetch shelter account",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Shelter info retrieved successfully",
+		"data": fiber.Map{
+			"info": shelterInfo,
+		},
+	})
+}
+
+func GetShelterDetailsByID(c *fiber.Ctx) error {
+	shelterID := c.Params("id")
+
+	// Fetch shelter info by ID
+	var shelterInfo models.ShelterInfo
+	infoResult := middleware.DBConn.Where("shelter_id = ?", shelterID).First(&shelterInfo)
+
+	// If no shelter info is found, set it to null
+	var infoResponse interface{}
+	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+		infoResponse = nil
+	} else if infoResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Database error while fetching shelter info",
+		})
+	} else {
+		infoResponse = shelterInfo
+	}
+
+	// Fetch shelter media by ID
+	var shelterMedia models.ShelterMedia
+	mediaResult := middleware.DBConn.Where("shelter_id = ?", shelterID).First(&shelterMedia)
+
+	// If no shelter media is found, set it to null
+	var mediaResponse interface{}
+	if errors.Is(mediaResult.Error, gorm.ErrRecordNotFound) {
+		mediaResponse = nil
+	} else if mediaResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Database error while fetching shelter media",
+		})
+	} else {
+		mediaResponse = shelterMedia
+	}
+
+	// Combine shelter info and media into a single response
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Shelter details retrieved successfully",
+		"data": fiber.Map{
+			"info":  infoResponse,
+			"media": mediaResponse,
+		},
+	})
+}
+
+func UpdateShelterDetails(c *fiber.Ctx) error {
+	shelterID := c.Params("id")
+
+	// Fetch shelter info by ID
+	var shelterInfo models.ShelterInfo
+	infoResult := middleware.DBConn.Where("shelter_id = ?", shelterID).First(&shelterInfo)
+
+	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "Shelter info not found",
+		})
+	} else if infoResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Database error while fetching shelter info",
+		})
+	}
+
+	// Parse request body for updated details
+	updateData := struct {
+		ShelterName        string `json:"shelter_name"`
+		ShelterAddress     string `json:"shelter_address"`
+		ShelterLandmark    string `json:"shelter_landmark"`
+		ShelterContact     string `json:"shelter_contact"`
+		ShelterEmail       string `json:"shelter_email"`
+		ShelterOwner       string `json:"shelter_owner"`
+		ShelterDescription string `json:"shelter_description"`
+		ShelterSocial      string `json:"shelter_social"`
+		ShelterProfile     string `json:"shelter_profile"` // Binary data for profile
+		ShelterCover       string `json:"shelter_cover"`   // Binary data for cover
+	}{}
+
+	if err := c.BodyParser(&updateData); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid request body",
+		})
+	}
+
+	// Update shelter info fields
+	shelterInfo.ShelterName = updateData.ShelterName
+	shelterInfo.ShelterAddress = updateData.ShelterAddress
+	shelterInfo.ShelterLandmark = updateData.ShelterLandmark
+	shelterInfo.ShelterContact = updateData.ShelterContact
+	shelterInfo.ShelterEmail = updateData.ShelterEmail
+	shelterInfo.ShelterOwner = updateData.ShelterOwner
+	shelterInfo.ShelterDescription = updateData.ShelterDescription
+	shelterInfo.ShelterSocial = updateData.ShelterSocial
+
+	// Save updated shelter info to the database
+	if err := middleware.DBConn.Save(&shelterInfo).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to update shelter info",
+		})
+	}
+
+	// Fetch shelter media by ID
+	var shelterMedia models.ShelterMedia
+	mediaResult := middleware.DBConn.Where("shelter_id = ?", shelterID).First(&shelterMedia)
+
+	if errors.Is(mediaResult.Error, gorm.ErrRecordNotFound) {
+		// If no media exists, create a new entry
+		shelterMedia = models.ShelterMedia{
+			ShelterID:      shelterInfo.ShelterID,
+			ShelterProfile: updateData.ShelterProfile,
+			ShelterCover:   updateData.ShelterCover,
+		}
+		if err := middleware.DBConn.Create(&shelterMedia).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Failed to create shelter media",
+			})
+		}
+	} else if mediaResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Database error while fetching shelter media",
+		})
+	} else {
+		// Update existing media
+		shelterMedia.ShelterProfile = updateData.ShelterProfile
+		shelterMedia.ShelterCover = updateData.ShelterCover
+
+		if err := middleware.DBConn.Save(&shelterMedia).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Failed to update shelter media",
+			})
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Shelter details and media updated successfully",
+		"data": fiber.Map{
+			"info":  shelterInfo,
+			"media": shelterMedia,
 		},
 	})
 }
