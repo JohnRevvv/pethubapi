@@ -1,128 +1,101 @@
 package controllers
 
 import (
-	"fmt"
 	"encoding/base64"
-	"io/ioutil"
+	"io"
+	"pethub_api/middleware"
 	"pethub_api/models"
 	"strconv"
+	"time"
+
 	"github.com/gofiber/fiber/v2"
-	"gorm.io/gorm"
 )
 
-var DBConn *gorm.DB // Assume DB is initialized elsewhere
-
-// Helper function to convert image file to Base64 string
-func ConvertImageToBase64(c *fiber.Ctx, fieldName string) (string, error) {
-	file, err := c.FormFile(fieldName)
-	if err != nil {
-		if err.Error() == "file not found" {
-			// No file uploaded, return empty string
-			return "", nil
-		}
-		return "", fmt.Errorf("failed to get file for field '%s': %v", fieldName, err)
-	}
-
-	fileContent, err := file.Open()
-	if err != nil {
-		return "", fmt.Errorf("failed to open file for field '%s': %v", fieldName, err)
-	}
-	defer fileContent.Close()
-
-	fileBytes, err := ioutil.ReadAll(fileContent)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file for field '%s': %v", fieldName, err)
-	}
-
-	return base64.StdEncoding.EncodeToString(fileBytes), nil
-}
-
-// Updated function for adding pet info and media
+// AddPetInfo handles adding pet information and associated media
 func AddPetInfo(c *fiber.Ctx) error {
-	shelterID := c.Params("id")
-	parsedShelterID, err := strconv.Atoi(shelterID)
-	if err != nil || parsedShelterID < 0 {
+	// Get ShelterID from route parameters
+	shelterIDParam := c.Params("id")
+	shelterID, err := strconv.ParseUint(shelterIDParam, 10, 32)
+	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Invalid shelter ID provided",
+			"message": "Invalid Shelter ID",
 		})
 	}
 
-	// Safe conversion from int to uint
-	pet := models.PetInfo{ShelterID: uint(parsedShelterID)}
+	// Parse form values
+	petAge, _ := strconv.Atoi(c.FormValue("pet_age")) // Convert age to int
 
-	// Parse request body
-	if err := c.BodyParser(&pet); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Failed to parse request body into pet data",
-		})
+	requestBody := struct {
+		PetType         string `json:"pet_type"`
+		PetName         string `json:"pet_name"`
+		PetAge          int    `json:"pet_age"`
+		AgeType         string `json:"age_type"`
+		PetSex          string `json:"pet_sex"`
+		PetDescriptions string `json:"pet_descriptions"`
+		PetImage1       string `json:"pet_image1"`
+	}{
+		PetType:         c.FormValue("pet_type"),
+		PetName:         c.FormValue("pet_name"),
+		PetAge:          petAge,
+		AgeType:         c.FormValue("age_type"),
+		PetSex:          c.FormValue("pet_sex"),
+		PetDescriptions: c.FormValue("pet_descriptions"),
+		PetImage1:       c.FormValue("pet_image1"),
 	}
 
-// Validate required fields
-if pet.PetName == "" {
-    return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-        "message": "Missing required field: pet_name",
-    })
-}
+	// Create PetInfo instance
+	petInfo := models.PetInfo{
+		ShelterID:       uint(shelterID),
+		PetType:         requestBody.PetType,
+		PetName:         requestBody.PetName,
+		PetAge:          requestBody.PetAge,
+		AgeType:         requestBody.AgeType,
+		PetSex:          requestBody.PetSex,
+		PetDescriptions: requestBody.PetDescriptions,
+		CreatedAt:       time.Now(),
+	}
 
-if pet.PetAge == 0 {
-    return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-        "message": "Missing required field: pet_age",
-    })
-}
-
-if pet.AgeType == "" {
-    return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-        "message": "Missing required field: age_type",
-    })
-}
-
-if pet.PetSex == "" {
-    return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-        "message": "Missing required field: pet_sex",
-    })
-}
-
-if pet.PetDescriptions == "" {
-    return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-        "message": "Missing required field: pet_descriptions",
-    })
-}
-
-
-	// Save pet to database
-	if err := DBConn.Create(&pet).Error; err != nil {
+	// Database transaction
+	tx := middleware.DBConn.Begin()
+	if err := tx.Create(&petInfo).Error; err != nil {
+		tx.Rollback()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to add pet information to the database",
+			"message": "Failed to add pet",
 		})
 	}
 
-	// Process images
-	petMedia := models.PetMedia{PetID: pet.PetID}
-	imageFields := []string{"pet_image1", "pet_image2", "pet_image3", "pet_image4"}
-	imagePointers := []*string{&petMedia.PetImage1, &petMedia.PetImage2, &petMedia.PetImage3, &petMedia.PetImage4}
+	// Process Images
+	petMedia := models.PetMedia{PetID: petInfo.PetID}
+	petMedia.PetImage1 = processImage(c, "pet_image1", requestBody.PetImage1)
 
-	for i, field := range imageFields {
-		base64Str, err := ConvertImageToBase64(c, field)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "Error while processing image: " + err.Error(),
-			})
-		}
-		*imagePointers[i] = base64Str
-	}
-
-	// Save media to database
-	if err := DBConn.Create(&petMedia).Error; err != nil {
+	if err := tx.Create(&petMedia).Error; err != nil {
+		tx.Rollback()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to save pet media to the database",
+			"message": "Failed to add pet media",
 		})
 	}
+
+	tx.Commit()
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Pet and media added successfully",
+		"message": "Pet added successfully",
 		"data": fiber.Map{
-			"pet":   pet,
-			"media": petMedia,
+			"pet_info": petInfo,
+			"image":    petMedia,
 		},
 	})
+}
+
+// processImage handles file uploads and Base64 strings
+func processImage(c *fiber.Ctx, formKey, base64Str string) string {
+	uploadedFile, err := c.FormFile(formKey)
+	if err == nil {
+		file, err := uploadedFile.Open()
+		if err == nil {
+			defer file.Close()
+			fileBytes, _ := io.ReadAll(file)
+			return base64.StdEncoding.EncodeToString(fileBytes)
+		}
+	}
+	return base64Str
 }

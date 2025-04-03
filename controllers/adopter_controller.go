@@ -23,7 +23,7 @@ func RegisterAdopter(c *fiber.Ctx) error {
 		Age           int    `json:"age"`
 		Sex           string `json:"sex"`
 		Address       string `json:"address"`
-		ContactNumber int    `json:"contact_number"`
+		ContactNumber string `json:"contact_number"`
 		Email         string `json:"email"`
 		Occupation    string `json:"occupation"`
 		CivilStatus   string `json:"civil_status"`
@@ -135,8 +135,8 @@ func LoginAdopter(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check password (assuming password is stored as plain text for now)
-	if adopterAccount.Password != requestBody.Password {
+	// Check password using bcrypt
+	if err := bcrypt.CompareHashAndPassword([]byte(adopterAccount.Password), []byte(requestBody.Password)); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Invalid username or password",
 		})
