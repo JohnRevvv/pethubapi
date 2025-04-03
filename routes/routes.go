@@ -28,6 +28,6 @@ func AppRoutes(app *fiber.App) {
 	app.Post("/shelter/:id/upload-media", shelter.UploadShelterMedia) // Route to upload or update shelter media
 
 	//pet
-	//app.Post("/shelter/:id/add-pet-info", shelter.AddPetInfo) 
+	app.Post("/shelter/:id/add-pet-info", shelter.AddPetInfo) 
 	//app.Post("/shelter/:id/add-pet-media", shelter.AddPetMedia) 
 }

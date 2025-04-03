@@ -46,12 +46,12 @@ func AddPetMedia(c *fiber.Ctx) error {
             switch i {
             case 1:
                 petMedia.PetImage1 = encodedImage
-            case 2:
-                petMedia.PetImage2 = encodedImage
-            case 3:
-                petMedia.PetImage3 = encodedImage
-            case 4:
-                petMedia.PetImage4 = encodedImage
+           // case 2:
+           //     petMedia.PetImage2 = encodedImage
+          //  case 3:
+            //    petMedia.PetImage3 = encodedImage
+           // case 4:
+               // petMedia.PetImage4 = encodedImage
             }
         }
     }
