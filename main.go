@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"pethub_api/controllers"
+	//"pethub_api/controllers"
 	"pethub_api/middleware"
 	"pethub_api/routes"
 
@@ -19,7 +19,7 @@ func init() {
 	} else {
 		fmt.Println("DB CONNECTION SUCCESSFUL!")
 		// Assign the database connection to the controllers.DB variable
-		controllers.DB = middleware.DBConn
+		//controllers.DB = middleware.DBConn
 	}
 }
 
@@ -52,7 +52,8 @@ func main() {
 	if port == "" {
 		port = "5566" // Default to port 5566 if not set
 	}
-	app.Listen("0.0.0.0:" + port) // Bind to all network interfaces
-}
 
-//johnrev
+	app.Listen("0.0.0.0:" + port) // Bind to all network interfaces
+
+	app.Listen(fmt.Sprintf(":%s", port))
+}

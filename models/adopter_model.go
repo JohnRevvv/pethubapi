@@ -13,7 +13,7 @@ type AdopterAccount struct {
 
 // TableName overrides default table name
 func (AdopterAccount) TableName() string {
-	return "adopter_accounts"
+	return "adopteraccount"
 }
 
 // AdopterInfo model (linked to existing "adopterinfo" table)
@@ -25,7 +25,7 @@ type AdopterInfo struct {
 	Sex           string `json:"sex"`
 	Address       string `json:"address"`
 	ContactNumber int    `json:"contact_number"`
-	Email         string `gorm:"unique;not null" json:"email"`
+	Email         string `gorm:"unique" json:"email"`
 	Occupation    string `json:"occupation"`
 	CivilStatus   string `json:"civil_status"`
 	SocialMedia   string `json:"social_media"`
@@ -33,5 +33,6 @@ type AdopterInfo struct {
 
 // TableName overrides default table name
 func (AdopterInfo) TableName() string {
-	return "adopter_infos"
+	return "adopterinfo"
+
 }

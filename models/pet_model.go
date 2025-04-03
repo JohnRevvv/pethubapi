@@ -4,9 +4,10 @@ import "time"
 
 type PetInfo struct {
 	PetID           uint   `gorm:"primaryKey" json:"pet_id"`
-	ShelterID       int    `gorm:"autoIncrement:false" json:"shelter_id"`
+	ShelterID       uint   `gorm:"autoIncrement:false" json:"shelter_id"`
 	PetName         string `json:"pet_name"`
 	PetAge          int    `json:"pet_age"`
+	AgeType         string `json:"age_type"`
 	PetSex          string `json:"pet_sex"`
 	PetDescriptions string `json:"pet_descriptions"`
 	Status          string `gorm:"default:'available'" json:"status"`
@@ -19,11 +20,11 @@ func (PetInfo) TableName() string {
 }
 
 type PetMedia struct {
-	PetID      uint   `gorm:"primaryKey" json:"pet_id"`
-	PetProfile []byte `json:"pet_profile"` // Binary data for profile image
-	PetImage1  []byte `json:"pet_image1"`  // Binary data for image 1
-	PetImage2  []byte `json:"pet_image2"`  // Binary data for image 2
-	PetImage3  []byte `json:"pet_image3"`  // Binary data for image 3
+	PetID     uint   `gorm:"not null;constraint:OnDelete:CASCADE;" json:"pet_id"`
+	PetImage1 string ` json:"pet_image1"` // Base64-encoded image
+	PetImage2 string ` json:"pet_image2"`
+	PetImage3 string `json:"pet_image3"`
+	PetImage4 string `json:"pet_image4"`
 }
 
 // TableName overrides default table name
