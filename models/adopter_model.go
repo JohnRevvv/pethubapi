@@ -13,7 +13,7 @@ type AdopterAccount struct {
 
 // TableName overrides default table name
 func (AdopterAccount) TableName() string {
-	return "adopteraccount"
+	return "adopter_accounts"
 }
 
 // AdopterInfo model (linked to existing "adopterinfo" table)
@@ -33,5 +33,5 @@ type AdopterInfo struct {
 
 // TableName overrides default table name
 func (AdopterInfo) TableName() string {
-	return "adopterinfo"
+	return "adopter_infos"
 }

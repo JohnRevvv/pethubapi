@@ -37,7 +37,7 @@ func (ShelterInfo) TableName() string {
 type ShelterMedia struct {
 	ShelterID      uint   `gorm:"primaryKey;autoIncrement:false" json:"shelter_id"`
 	ShelterProfile string `json:"shelter_profile"`
-	ShelterCover   string `json: "shelter_cover"`
+	ShelterCover   string `json:"shelter_cover"`
 }
 
 func (ShelterMedia) TableName() string {

@@ -52,7 +52,7 @@ func main() {
 	if port == "" {
 		port = "5566" // Default to port 5566 if not set
 	}
-	app.Listen(fmt.Sprintf(":%s", port))
+	app.Listen("0.0.0.0:" + port) // Bind to all network interfaces
 }
 
 //johnrev
