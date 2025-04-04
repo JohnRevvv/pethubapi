@@ -45,3 +45,32 @@ func GetAllPetsByShelterID(c *fiber.Ctx) error {
 		"data":    pets,
 	})
 }
+
+func GetPetInfoByPetID(c *fiber.Ctx) error {
+	petIDParam := c.Params("id")
+	if petIDParam == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Pet ID parameter is missing",
+		})
+	}
+
+	petID, err := strconv.Atoi(petIDParam)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid pet ID",
+		})
+	}
+
+	var pet models.PetInfo
+	result := middleware.DBConn.Preload("PetMedia").First(&pet, petID)
+	if result.Error != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Pet not found",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Pet retrieved successfully",
+		"data":    pet,
+	})
+}
