@@ -135,8 +135,9 @@ func LoginAdopter(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check password (assuming password is stored as plain text for now)
-	if adopterAccount.Password != requestBody.Password {
+	// Compare the hashed password with the provided password
+	err := bcrypt.CompareHashAndPassword([]byte(adopterAccount.Password), []byte(requestBody.Password))
+	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Invalid username or password",
 		})

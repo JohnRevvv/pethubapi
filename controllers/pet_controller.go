@@ -47,14 +47,14 @@ func AddPet(c *fiber.Ctx) error {
 	}
 
 	// Ensure the shelter ID in the request matches the URL parameter
-	if pet.ShelterID != 0 && pet.ShelterID != shelterID {
+	if pet.ShelterID != 0 && pet.ShelterID != uint(shelterID) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Shelter ID in request body does not match URL parameter",
 		})
 	}
 
 	// Set the shelter ID from the URL parameter
-	pet.ShelterID = shelterID
+	pet.ShelterID = uint(shelterID)
 
 	// Validate required fields
 	if pet.PetName == "" || pet.PetAge == 0 || pet.PetSex == "" || pet.PetDescriptions == "" {

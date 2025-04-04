@@ -40,6 +40,8 @@ func ConnectDB() bool {
 		&models.ShelterInfo{},
 		&models.ShelterMedia{},
 		&models.PetInfo{},
-		&models.PetMedia{})
+		&models.PetMedia{},
+		&models.AdoptionApplication{},
+		&models.Questionnaires{})
 	return false
 }
