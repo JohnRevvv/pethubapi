@@ -38,5 +38,5 @@ func (AdopterInfo) TableName() string {
 
 type AdopterMedia struct {
 	AdopterID      uint   `gorm:"primaryKey;autoIncrement:false" json:"adopter_id"`
-	AdopterProfile string `json:"profile"`
+	AdopterProfile string `json:"adopter_profile"`
 }

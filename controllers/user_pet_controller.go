@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"pethub_api/middleware"
@@ -219,57 +218,4 @@ func SubmitAdoptionRequest(c *fiber.Ctx) error {
 }
 
 // GetAdopterInfoByID retrieves adopter info and media by ID
-// for User profile Edit
-func GetAdopterInfoByID(c *fiber.Ctx) error {
-	adopterID := c.Params("id")
-
-	// Fetch shelter info by ID
-	var adopterInfo models.AdopterInfo
-	infoResult := middleware.DBConn.Where("adopter_id = ?", adopterID).First(&adopterInfo)
-
-	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"message": "Adopter info not found",
-		})
-	} else if infoResult.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Database error while fetching adopter info",
-		})
-	}
-
-	// Fetch shelter media by ID
-	var adopterMedia models.AdopterMedia
-	mediaResult := middleware.DBConn.Where("shelter_id = ?", adopterID).First(&adopterMedia)
-
-	// If no shelter media is found, set it to null
-	var mediaResponse interface{}
-	if errors.Is(mediaResult.Error, gorm.ErrRecordNotFound) {
-		mediaResponse = nil
-	} else if mediaResult.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Database error while fetching adopter media",
-		})
-	} else {
-		// Decode Base64-encoded images
-		decodedProfile, err := base64.StdEncoding.DecodeString(adopterMedia.AdopterProfile)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "Failed to decode profile image",
-			})
-		}
-
-		// Include decoded images in the response
-		mediaResponse = fiber.Map{
-			"adopter_profile": decodedProfile,
-		}
-	}
-
-	// Combine shelter info and media into a single response
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Adopter info retrieved successfully",
-		"data": fiber.Map{
-			"info":  adopterInfo,
-			"media": mediaResponse,
-		},
-	})
-}
+// for User

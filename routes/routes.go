@@ -13,11 +13,11 @@ func AppRoutes(app *fiber.App) {
 
 	// Adopter
 	app.Post("/user/register", controllers.RegisterAdopter)
-	app.Post("/user/login", controllers.LoginAdopter)  // Changed to POST for login
-	app.Get("/user", controllers.GetAllAdopters)       // Route to get all adopters
-	app.Get("/user/:id", controllers.GetAdopterByID)   // Route to get adopter by id
-	app.Get("/users/petinfo", controllers.GetAllPets)  // Route to get all pets // user view all pet
-	app.Get("/users/pets/:id", controllers.GetPetByID) // Route to get pet by id
+	app.Post("/user/login", controllers.LoginAdopter)    // Changed to POST for login
+	app.Get("/user", controllers.GetAllAdopters)         // Route to get all adopters
+	app.Get("/user/:id", controllers.GetAdopterInfoByID) // Route to get adopter by id
+	app.Get("/users/petinfo", controllers.GetAllPets)    // Route to get all pets // user view all pet
+	app.Get("/users/pets/:id", controllers.GetPetByID)   // Route to get pet by id
 
 	// Shelter
 	app.Post("/shelter/register", shelter.RegisterShelter)            // Route to register a shelter
@@ -33,10 +33,16 @@ func AppRoutes(app *fiber.App) {
 	//app.Post("/shelter/:id/add-pet-info", shelter.AddPetInfo)
 	//app.Post("/shelter/:id/add-pet-media", shelter.AddPetMedia)
 	app.Post("/shelter/:id/add-pet-info", shelter.AddPetInfo)
+	app.Get("/shelter/:id/pets", shelter.GetAllPetsInfoByShelterID)
+
+	app.Post("/shelter/:id/add-pet-info", shelter.AddPetInfo)
 	app.Get("/allshelter", controllers.GetShelter)
 	app.Post("/shelter/:id/petinfo", shelter.AddPetInfo)           // pets inside shelter
 	app.Get("/users/shelters/:id", controllers.GetAllSheltersByID) // shelters view all button
 	app.Get("/users/profile/:id", controllers.GetAdopterInfoByID)
 	app.Put("/users/:id/update-info", controllers.UpdateAdopterDetails)
-	app.Post("/users/:id/upload-media", controllers.UploadAdopterMedia) // Route to upload or update adopter media
+	app.Post("/users/:id/upload-media", controllers.UploadAdopterMedia)
+
+	app.Get("/adopter/:id", controllers.GetAdopterProfile) // Route to upload or update adopter media// Route to get adopter media by ID
+	app.Put("/adopter/:id", controllers.EditAdopterProfile)
 }
