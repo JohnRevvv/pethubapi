@@ -22,7 +22,7 @@ func AppRoutes(app *fiber.App) {
 	// Shelter
 	app.Post("/shelter/register", shelter.RegisterShelter)            // Route to register a shelter
 	app.Post("/shelter/login", shelter.LoginShelter)                  // Changed to POST for login
-	app.Get("/user/:id/pet", shelter.GetAllPetsByShelterID)       // Route to get all pets by shelter ID
+	app.Get("/user/:id/pet", shelter.GetAllPetsInfoByShelterID)       // Route to get all pets by shelter ID
 	app.Get("/shelters", controllers.GetAllShelters)                  // Route to get all shelters
 	app.Get("/shelter", controllers.GetShelterByName)                 // Route to get shelter by name
 	app.Get("/shelter/:id", shelter.GetShelterInfoByID)               // Route to get shelter by ID
@@ -31,6 +31,7 @@ func AppRoutes(app *fiber.App) {
 	app.Get("/shelter/:id/petinfo", shelter.GetPetInfoByPetID) // Route to get shelter media by ID
 	app.Post("/shelter/:id/add-pet-info", shelter.AddPetInfo)
 	app.Get("/shelter/:id/pets", shelter.GetAllPetsInfoByShelterID)
+	app.Put("/shelter/:id/update-pet-info", shelter.UpdatePetInfo) // Route to update pet info
 
 	app.Post("/shelter/:id/add-pet-info", shelter.AddPetInfo)
 	app.Get("/allshelter", controllers.GetShelter)

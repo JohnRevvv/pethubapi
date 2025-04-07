@@ -13,7 +13,7 @@ type PetInfo struct {
 	PetDescriptions string     `json:"pet_descriptions"`
 	Status          string     `gorm:"default:'available'" json:"status"`
 	CreatedAt       time.Time  `json:"created_at"`
-	PetMedia        []PetMedia `gorm:"foreignKey:PetID;references:PetID" json:"petmedia"`
+	PetMedia        PetMedia `gorm:"foreignKey:PetID;references:PetID" json:"petmedia"`
 }
 
 func (PetInfo) TableName() string {
