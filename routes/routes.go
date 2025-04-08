@@ -37,7 +37,14 @@ func AppRoutes(app *fiber.App) {
 
 	// Adoptionform Routes
 	app.Post("/adoption-application/:pet_id", controllers.SubmitAdoptionApplication)
-	// Route for getting adoption application by adopter_id
+
+	// Route for getting specific adoption application by adopter_id
 	app.Get("/adoption-application/:adopter_id", controllers.GetAdoptionApplication)
+
+	// Route for getting a specific questionanire form by adopter_id
+	app.Get("/questionnaire/:application_id", controllers.GetQuestionnaire)
+
+	// Route for getting both adoption application and questionnaire form by adopter_id
+	app.Get("/adoption-and-questionnaire/:adopter_id", controllers.GetAdoptionApplicationAndQuestionnaire)
 
 }

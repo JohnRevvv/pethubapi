@@ -7,38 +7,32 @@ import (
 // Questionnaires represents the adoption questionnaire table
 type Questionnaires struct {
 	QuestionID               uint   `json:"question_id" gorm:"primaryKey;autoIncrement"`
-	ApplicationID            uint   `json:"application_id" gorm:"not null;constraint:OnDelete:CASCADE;"` // Foreign key to applications
-	PetType                  string `json:"pet_type" gorm:"not null"`                                    // Cat, Dog, Both, Not decided
-	SpecificShelterAnimal    bool   `json:"specific_shelter_animal" gorm:"default:false"`                // Applying for a specific animal?
-	IdealPetDescription      string `json:"ideal_pet_description,omitempty"`
+	ApplicationID            uint   `json:"application_id" gorm:"column:application_id"` // Foreign key to applications
+	PetType                  string `json:"pet_type" gorm:"not null"`                    // Cat, Dog, Both, Not decided
+	SpecificShelterAnimal    string `json:"specific_shelter_animal" gorm:"default:'no'"` // Change to string ("yes"/"no")
+	IdealPetDescription      string `json:"ideal_pet_description,omitempty" gorm:"column:ideal_pet_description"`
 	BuildingType             string `json:"building_type,omitempty"`
-	Rent                     bool   `json:"rent" gorm:"default:false"`
+	Rent                     string `json:"rent" gorm:"default:'no'"` // Change to string ("yes"/"no")
 	PetMovePlan              string `json:"pet_move_plan,omitempty"`
 	HouseholdComposition     string `json:"household_composition,omitempty"`
-	AllergiesToAnimals       bool   `json:"allergies_to_animals" gorm:"default:false"`
+	AllergiesToAnimals       string `json:"allergies_to_animals" gorm:"default:'no'"` // Change to string ("yes"/"no")
 	CareResponsibility       string `json:"care_responsibility,omitempty"`
 	FinancialResponsibility  string `json:"financial_responsibility,omitempty"`
 	VacationCarePlan         string `json:"vacation_care_plan,omitempty"`
-	AloneTime                int    `json:"alone_time,omitempty"`
+	AloneTime                string `json:"alone_time,omitempty"`
 	IntroductionPlan         string `json:"introduction_plan,omitempty"`
-	FamilySupport            bool   `json:"family_support" gorm:"default:false"`
+	FamilySupport            string `json:"family_support" gorm:"default:'no'"` // Change to string ("yes"/"no")
 	FamilySupportExplanation string `json:"family_support_explanation,omitempty"`
-	OtherPets                bool   `json:"other_pets" gorm:"default:false"`
-	PastPets                 bool   `json:"past_pets" gorm:"default:false"`
-
-	// Home Photos (stored as JSONB for multiple images)
-	HomePhotos []string `json:"home_photos,omitempty" gorm:"type:jsonb"`
-
-	// Valid ID (stores front and back images as JSONB)
-	ValidID map[string]string `json:"valid_id,omitempty" gorm:"type:jsonb"`
-
-	// Interview details
-	ZoomInterviewDate time.Time `json:"zoom_interview_date,omitempty"`
-	ZoomInterviewTime time.Time `json:"zoom_interview_time,omitempty"`
-
-	ShelterVisit bool      `json:"shelter_visit" gorm:"default:false"`
-	CreatedAt    time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt    time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	OtherPets                string `json:"other_pets" gorm:"default:'no'"` // Change to string ("yes"/"no")
+	PastPets                 string `json:"past_pets" gorm:"default:'no'"`  // Change to string ("yes"/"no")
+	HomePhotos               string // store paths as comma-separated string
+	ValidID                  string
+	IDProof                  string    `json:"id_proof,omitempty"`
+	ZoomInterviewDate        string    `json:"zoom_interview_date,omitempty"`
+	ZoomInterviewTime        string    `json:"zoom_interview_time,omitempty"`
+	ShelterVisit             string    `json:"shelter_visit" gorm:"default:'no'"` // Change to string ("yes"/"no")
+	CreatedAt                time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt                time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
 // TableName sets the database table name

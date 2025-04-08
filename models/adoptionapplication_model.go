@@ -14,8 +14,8 @@ type AdoptionApplication struct {
 	AltEmail         string    `json:"alt_email" gorm:"column:alt_email;not null"`
 	HouseFile        string    `json:"housefile" gorm:"column:housefile;not null"` // Path or URL to house photos
 	ValidID          string    `json:"valid_id" gorm:"column:valid_id;not null"`
-	PreferredDate    time.Time `json:"preferred_date" gorm:"column:preferred_date;not null"` // Changed to time.Time
-	PreferredTime    time.Time `json:"preferred_time" gorm:"column:preferred_time;not null"` // Changed to time.Time
+	PreferredDate    string    `json:"preferred_date" gorm:"column:preferred_date;not null"` // Changed to time.Time
+	PreferredTime    string    `json:"preferred_time" gorm:"column:preferred_time;not null"` // Changed to time.Time
 	Status           string    `json:"status" gorm:"column:status;type:varchar(20);default:'Pending'"`
 	CreatedAt        time.Time `json:"created_at"` // Explicit CreatedAt field
 	UpdatedAt        time.Time `json:"updated_at"` // Explicit UpdatedAt field
