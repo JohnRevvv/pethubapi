@@ -20,14 +20,14 @@ func AppRoutes(app *fiber.App) {
 	app.Get("/users/pets/:id", controllers.GetPetByID)   // Route to get pet by id
 
 	// Shelter
-	app.Post("/shelter/register", shelter.RegisterShelter)            // Route to register a shelter
-	app.Post("/shelter/login", shelter.LoginShelter)                  // Changed to POST for login
+	app.Post("/shelter/register", controllers.RegisterShelter)            // Route to register a shelter
+	app.Post("/shelter/login", controllers.LoginShelter)                  // Changed to POST for login
 	app.Get("/user/:id/pet", shelter.GetAllPetsInfoByShelterID)       // Route to get all pets by shelter ID
 	app.Get("/shelters", controllers.GetAllShelters)                  // Route to get all shelters
 	app.Get("/shelter", controllers.GetShelterByName)                 // Route to get shelter by name
-	app.Get("/shelter/:id", shelter.GetShelterInfoByID)               // Route to get shelter by ID
-	app.Put("/shelter/:id/update-info", shelter.UpdateShelterDetails) // Route to update shelter details
-	app.Post("/shelter/:id/upload-media", shelter.UploadShelterMedia) // Route to upload or update shelter media
+	app.Get("/shelter/:id", controllers.GetShelterInfoByID)               // Route to get shelter by ID
+	app.Put("/shelter/:id/update-info", controllers.UpdateShelterDetails) // Route to update shelter details
+	app.Post("/shelter/:id/upload-media", controllers.UploadShelterMedia) // Route to upload or update shelter media
 	app.Get("/shelter/:id/petinfo", shelter.GetPetInfoByPetID) // Route to get shelter media by ID
 	app.Post("/shelter/:id/add-pet-info", shelter.AddPetInfo)
 	app.Get("/shelter/:id/pets", shelter.GetAllPetsInfoByShelterID)
@@ -42,4 +42,7 @@ func AppRoutes(app *fiber.App) {
 
 	app.Get("/adopter/:id", controllers.GetAdopterProfile) // Route to upload or update adopter media// Route to get adopter media by ID
 	app.Put("/adopter/:id", controllers.EditAdopterProfile)
+
+
+
 }

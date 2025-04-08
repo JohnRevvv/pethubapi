@@ -34,12 +34,14 @@ func ConnectDB() bool {
 	fmt.Println("Database connection established successfully")
 
 	// Auto-migrate models
-	DBConn.AutoMigrate(&models.AdopterAccount{}, 
-		&models.AdopterInfo{}, 
-		&models.ShelterAccount{}, 
+	DBConn.AutoMigrate(
+		&models.AdopterAccount{},
+		&models.AdopterInfo{},
+		&models.ShelterAccount{},
 		&models.ShelterInfo{},
-		&models.ShelterMedia{}, 
+		&models.ShelterMedia{},
 		&models.PetInfo{},
-		&models.PetMedia{})
+		&models.PetMedia{},
+	)
 	return false
 }

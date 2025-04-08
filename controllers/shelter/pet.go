@@ -21,16 +21,12 @@ type PetResponse struct {
 	PetImages []string `json:"pet_image1"`
 }
 
-// ================================================
-//          GET ALL PETS BY SHELTER ID
-// ================================================
-
 func GetAllPetsInfoByShelterID(c *fiber.Ctx) error {
 	shelterID := c.Params("id")
 
 	// Fetch pet info for the given shelter
 	var petInfo []models.PetInfo
-	infoResult := middleware.DBConn.Where("shelter_id = ?", shelterID).Find(&petInfo)
+	infoResult := middleware.DBConn.Where("shelter_id = ?", shelterID).Order("created_at DESC").Find(&petInfo)
 
 	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -112,10 +108,6 @@ type PetInfoResponse struct {
 	PetImages       []string `json:"pet_image1"`
 }
 
-// ================================================
-//          GET SINGLE PET BY PET ID
-// ================================================
-
 func GetPetInfoByPetID(c *fiber.Ctx) error {
 	// Get the pet_id from the URL params
 	petID := c.Params("id")
@@ -177,18 +169,13 @@ func GetPetInfoByPetID(c *fiber.Ctx) error {
 	})
 }
 
-// ================================================
-//
-//	UPDATE PET BY PET ID
-//
-// ================================================
+// UpdatePetInfo and PetMedia
 func UpdatePetInfo(c *fiber.Ctx) error {
 	petID := c.Params("id")
 
 	// Fetch the existing PetInfo record
 	var petInfo models.PetInfo
 	infoResult := middleware.DBConn.Where("pet_id = ?", petID).First(&petInfo)
-
 	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"message": "Pet info not found",
@@ -201,8 +188,8 @@ func UpdatePetInfo(c *fiber.Ctx) error {
 
 	// Parse the request body for updates
 	var updateData struct {
-		PetInfo  models.PetInfo  `json:"pet_info"`
-		PetMedia models.PetMedia `json:"pet_media"`
+		PetInfo  models.PetInfo  `json:"petinfo"`
+		PetMedia models.PetMedia `json:"petmedia"`
 	}
 	if err := c.BodyParser(&updateData); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -229,35 +216,42 @@ func UpdatePetInfo(c *fiber.Ctx) error {
 	if updateData.PetInfo.PetDescriptions != petInfo.PetDescriptions {
 		petInfo.PetDescriptions = updateData.PetInfo.PetDescriptions
 	}
-	middleware.DBConn.Updates(&petInfo)
+
+	// Update the PetInfo in the database
+	middleware.DBConn.Table("petinfo").Updates(&petInfo)
 
 	// Update PetMedia if provided
-	if updateData.PetMedia.PetImage1 != "" {
-		var petMedia models.PetMedia
-		err := middleware.DBConn.Where("pet_id = ?", petID).First(&petMedia).Error
+	var petMedia models.PetMedia
+	err := middleware.DBConn.Debug().Table("petmedia").Where("pet_id = ?", petID).First(&petMedia).Error
 
-		if err == nil {
-			// Update existing pet media
-			middleware.DBConn.Model(&petMedia).Updates(models.PetMedia{
-				PetImage1: updateData.PetMedia.PetImage1,
-			})
-		} else if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Handle missing pet media (if needed)
-			// Example: You could create new PetMedia if allowed
-		} else {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "Error while checking pet media",
-			})
-		}
+	if err == nil {
+		// Encode the image to Base64
+		encodedImage := updateData.PetMedia.PetImage1 // Assuming PetImage1 is the base64 string sent from the client
+
+		// Update existing record with the Base64-encoded image
+		petMedia.PetImage1 = encodedImage // Replace the old image with the new one
+
+		// Update the PetMedia in the database
+		middleware.DBConn.Table("petmedia").Where("pet_id = ?", petID).Update("pet_image1", petMedia.PetImage1)
+
+	} else if errors.Is(err, gorm.ErrRecordNotFound) {
+		// Pet media record not found
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Pet media not found. Cannot update non-existent record.",
+		})
+	} else {
+		// Database error during update
+		return c.JSON(fiber.Map{
+			"message": "Database error while updating pet media",
+			"error":   err.Error(),
+		})
 	}
 
-	// Save updated PetInf
-
+	// Return the successful response
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Pet info and media updated successfully",
 		"data": fiber.Map{
-			"pet_info":  petInfo,
-			"pet_media": updateData.PetMedia,
+			"petinfo": petInfo,
 		},
 	})
 }
