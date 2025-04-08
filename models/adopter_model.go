@@ -24,7 +24,7 @@ type AdopterInfo struct {
 	Age           int    `json:"age"`
 	Sex           string `json:"sex"`
 	Address       string `json:"address"`
-	ContactNumber int    `json:"contact_number"`
+	ContactNumber string `json:"contact_number"`
 	Email         string `gorm:"unique" json:"email"`
 	Occupation    string `json:"occupation"`
 	CivilStatus   string `json:"civil_status"`
@@ -35,4 +35,9 @@ type AdopterInfo struct {
 func (AdopterInfo) TableName() string {
 	return "adopterinfo"
 
+}
+
+type AdopterMedia struct {
+	AdopterID      uint   `gorm:"primaryKey;autoIncrement:false" json:"adopter_id"`
+	AdopterProfile string `json:"adopter_profile"`
 }

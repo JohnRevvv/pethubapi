@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/base64"
 	"errors"
 	"time"
 
@@ -23,7 +24,7 @@ func RegisterAdopter(c *fiber.Ctx) error {
 		Age           int    `json:"age"`
 		Sex           string `json:"sex"`
 		Address       string `json:"address"`
-		ContactNumber int    `json:"contact_number"`
+		ContactNumber string `json:"contact_number"`
 		Email         string `json:"email"`
 		Occupation    string `json:"occupation"`
 		CivilStatus   string `json:"civil_status"`
@@ -204,39 +205,56 @@ func GetAllAdopters(c *fiber.Ctx) error {
 	})
 }
 
-func GetAdopterByID(c *fiber.Ctx) error {
+func GetAdopterInfoByID(c *fiber.Ctx) error {
 	adopterID := c.Params("id")
 
-	// Fetch adopter account
-	var adopterAccount models.AdopterAccount
-	accountResult := middleware.DBConn.Where("adopter_id = ?", adopterID).First(&adopterAccount)
-
-	if errors.Is(accountResult.Error, gorm.ErrRecordNotFound) {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"message": "Adopter not found",
-		})
-	} else if accountResult.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Database error",
-		})
-	}
-
-	// Fetch adopter info
+	// Fetch shelter info by ID
 	var adopterInfo models.AdopterInfo
 	infoResult := middleware.DBConn.Where("adopter_id = ?", adopterID).First(&adopterInfo)
 
-	if infoResult.Error != nil && !errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "Adopter info not found",
+		})
+	} else if infoResult.Error != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to fetch adopter info",
+			"message": "Database error while fetching adopter info",
 		})
 	}
 
-	// Return adopter details
+	// Fetch adopter media by ID
+	var adopterMedia models.AdopterMedia
+	mediaResult := middleware.DBConn.Where("adopter_id = ?", adopterID).First(&adopterMedia)
+
+	// If no adopter media is found, set it to null
+	var mediaResponse interface{}
+	if errors.Is(mediaResult.Error, gorm.ErrRecordNotFound) {
+		mediaResponse = nil
+	} else if mediaResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Database error while fetching shelter media",
+		})
+	} else {
+		// Decode Base64-encoded images
+		decodedProfile, err := base64.StdEncoding.DecodeString(adopterMedia.AdopterProfile)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Failed to decode profile image",
+			})
+		}
+
+		// Include decoded images in the response
+		mediaResponse = fiber.Map{
+			"shelter_profile": decodedProfile,
+		}
+	}
+
+	// Combine shelter info and media into a single response
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Adopter details retrieved successfully",
+		"message": "Shelter info retrieved successfully",
 		"data": fiber.Map{
-			"adopter": adopterAccount,
-			"info":    adopterInfo,
+			"info":  adopterInfo,
+			"media": mediaResponse,
 		},
 	})
 }
