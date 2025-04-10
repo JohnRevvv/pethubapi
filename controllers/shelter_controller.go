@@ -347,10 +347,6 @@ func UploadShelterMedia(c *fiber.Ctx) error {
 		})
 
 	if updateResult.Error != nil {
-		// return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-		// 	"message": "Failed to update shelter media",
-		// 	"error":   updateResult.Error.Error(),
-		// })
 		return c.JSON(response.ShelterResponseModel{
 			RetCode: "400",
 			Message: "Failed to update shelter media",
