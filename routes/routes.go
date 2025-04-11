@@ -2,7 +2,7 @@ package routes
 
 import (
 	"pethub_api/controllers"
-	shelter "pethub_api/controllers/shelter"
+	// shelter "pethub_api/controllers/shelter"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -18,28 +18,24 @@ func AppRoutes(app *fiber.App) {
 	app.Get("/user/:id", controllers.GetAdopterInfoByID) // Route to get adopter by id
 	app.Get("/users/petinfo", controllers.GetAllPets)    // Route to get all pets // user view all pet
 	app.Get("/users/pets/:id", controllers.GetPetByID)   // Route to get pet by id
-	app.Get("/user/:id/pet", shelter.GetAllPetsInfoByShelterID) 
+	app.Get("/user/:id/pet", controllers.GetAllPetsInfoByShelterID) 
 
 	// Shelter
 	app.Post("/shelter/register", controllers.RegisterShelter)            // Route to register a shelter
-	app.Post("/shelter/login", controllers.LoginShelter)                  // Changed to POST for login      // Route to get all pets by shelter ID
+	app.Post("/shelter/login", controllers.LoginShelter)                  // Changed to POST for login 
 	app.Get("/shelters", controllers.GetAllShelters)                  // Route to get all shelters
 	app.Get("/shelter", controllers.GetShelterByName)                 // Route to get shelter by name
 	app.Get("/shelter/:id", controllers.GetShelterInfoByID)               // Route to get shelter by ID
 	app.Put("/shelter/:id/update-info", controllers.UpdateShelterDetails) // Route to update shelter details
 	app.Post("/shelter/:id/upload-media", controllers.UploadShelterMedia) // Route to upload or update shelter media
-	app.Get("/shelter/:id/petinfo", shelter.GetPetInfoByPetID) // Route to get shelter media by ID
-	app.Post("/shelter/:id/add-pet-info", shelter.AddPetInfo)
-	app.Put("/shelter/:id/update-pet-info", shelter.UpdatePetInfo) // Route to update pet info
-	app.Put("/shelter/:id/archive-pet", shelter.SetPetStatusToArchive) // Route to archive pet info
+	app.Get("/shelter/:id/petinfo", controllers.GetPetInfoByPetID) // Route to get shelter media by ID
+	app.Put("/shelter/:id/update-pet-info", controllers.UpdatePetInfo) // Route to update pet info
+	app.Put("/shelter/:id/archive-pet", controllers.SetPetStatusToArchive) // Route to archive pet info
+	app.Put("/shelter/:id/unarchive-pet", controllers.SetPetStatusToUnarchive) // Route to unarchive pet info
+	app.Get("/filter/:id/pets/search", controllers.FetchAndSearchPets) // Route to search pets by name
+	app.Get("/shelter/archive/pets/:id/search", controllers.FetchAndSearchArchivedPets) // Route to get archived pets
 
-	// search
-	app.Get("/filter/:id/pets/search", shelter.FetchAndSearchPets) // Route to search pets by name
-	//app.Get("/search/pets/name/:pet_name", shelter.SearchPetsByName) // Route to search pets
-	//app.Get("/filter/pets/sex/:id/:pet_sex", shelter.FilterPetsBySex)
-	//app.Get("/filter/pets/type/:id/:pet_type", shelter.FilterPetsByPetType)
-
-	app.Post("/shelter/:id/add-pet-info", shelter.AddPetInfo)
+	app.Post("/shelter/:id/add-pet-info", controllers.AddPetInfo)
 	app.Get("/allshelter", controllers.GetShelter)
 	app.Get("/users/shelters/:id", controllers.GetAllSheltersByID) // shelters view all button
 	app.Get("/users/profile/:id", controllers.GetAdopterInfoByID)
@@ -49,6 +45,4 @@ func AppRoutes(app *fiber.App) {
 	app.Get("/adopter/:id", controllers.GetAdopterProfile) // Route to upload or update adopter media// Route to get adopter media by ID
 	app.Put("/adopter/:id", controllers.EditAdopterProfile)
 
-
-// pakyu
 }
