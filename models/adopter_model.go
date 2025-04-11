@@ -7,7 +7,7 @@ type AdopterAccount struct {
 	AdopterID uint   `gorm:"primaryKey" json:"adopter_id"`
 	Username  string `gorm:"unique;not null" json:"username"`
 	Password  string `json:"password"`
-	Status    string `json:"status"` // Status can be "Active", "Pending", "Declined", etc.
+	Status    string `json:"status"`
 	CreatedAt time.Time
 	//Info      AdopterInfo `gorm:"foreignKey:AdopterID;constraint:OnDelete:CASCADE" json:"info"`
 }
@@ -35,10 +35,21 @@ type AdopterInfo struct {
 // TableName overrides default table name
 func (AdopterInfo) TableName() string {
 	return "adopterinfo"
-
 }
 
 type AdopterMedia struct {
 	AdopterID      uint   `gorm:"primaryKey;autoIncrement:false" json:"adopter_id"`
 	AdopterProfile string `json:"adopter_profile"`
+}
+
+func (AdoptedPet) TableName() string {
+	return "adopterpets"
+}
+
+type AdoptedPet struct {
+	AdoptedID uint `gorm:"column:adopted_id;primaryKey;autoIncrement" json:"adopted_id"`
+
+	AdopterID uint `gorm:"column:adopter_id" json:"adopter_id"`
+
+	PetID uint `gorm:"column:pet_id" json:"pet_id"`
 }

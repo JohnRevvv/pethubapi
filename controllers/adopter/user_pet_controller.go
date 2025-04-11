@@ -24,55 +24,90 @@ type PetInfo struct {
 }
 
 // GetAllPets retrieves all pet records from the petinfo table
+type PetMedia struct {
+	PetID     uint    `json:"pet_id"`
+	PetImage1 *string `json:"pet_image1"`
+}
+
 func GetAllPets(c *fiber.Ctx) error {
-	// Create a slice to store all pets
+	// Get all pets first
 	var pets []PetInfo
-
-	// Fetch all pets from the database
-	result := middleware.DBConn.Table("petinfo").Find(&pets)
-
-	// Handle errors
-	if result.Error != nil {
+	if err := middleware.DBConn.Table("petinfo").Find(&pets).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Error retrieving pets",
 		})
 	}
 
-	// Return the list of pets
-	return c.JSON(pets)
+	// Get all pet media
+	var petMedia []PetMedia
+	if err := middleware.DBConn.Table("petmedia").Find(&petMedia).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error retrieving pet media",
+		})
+	}
+
+	// Create a map for quick lookup
+	mediaMap := make(map[uint]*string)
+	for _, media := range petMedia {
+		mediaMap[media.PetID] = media.PetImage1
+	}
+
+	// Combine the data
+	type Response struct {
+		PetInfo
+		PetImage1 *string `json:"pet_image1"`
+	}
+
+	var response []Response
+	for _, pet := range pets {
+		response = append(response, Response{
+			PetInfo:   pet,
+			PetImage1: mediaMap[pet.PetID],
+		})
+	}
+
+	return c.JSON(response)
 }
 
 func GetPetByID(c *fiber.Ctx) error {
 	petID := c.Params("id")
 
-	// Fetch shelter info by ID
-	var petInfo models.PetInfo
-	infoResult := middleware.DBConn.Table("petinfo").Where("pet_id = ?", petID).First(&petInfo)
+	var result struct {
+		models.PetInfo
+		PetImage1 string `json:"pet_image1"`
+	}
 
-	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"message": "pet info not found",
-		})
-	} else if infoResult.Error != nil {
+	if err := middleware.DBConn.Table("petinfo").
+		Select("petinfo.*, petmedia.pet_image1").
+		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
+		Where("petinfo.pet_id = ?", petID).
+		First(&result).Error; err != nil {
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"message": "pet info not found",
+			})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Database error",
 		})
 	}
 
-	// Fetch shelter account associated with the shelter info
-	var petData models.PetInfo
-	accountResult := middleware.DBConn.Where("pet_id = ?", petID).First(&petData)
-
-	if accountResult.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to fetch pet account",
-		})
-	}
-
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Shelter info retrieved successfully",
+		"message": "Pet info retrieved successfully",
 		"data": fiber.Map{
-			"info": petInfo,
+			"info": fiber.Map{
+				"pet_id":           result.PetID,
+				"shelter_id":       result.ShelterID,
+				"pet_name":         result.PetName,
+				"pet_age":          result.PetAge,
+				"pet_sex":          result.PetSex,
+				"pet_descriptions": result.PetDescriptions,
+				"status":           result.Status,
+				"created_at":       result.CreatedAt,
+				"pet_type":         result.PetType,
+				"pet_image1":       result.PetImage1,
+			},
 		},
 	})
 }
@@ -86,7 +121,7 @@ func GetAllSheltersByID(c *fiber.Ctx) error {
 
 	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"message": "shelter info not found",
+			"message": "Shelter info not found",
 		})
 	} else if infoResult.Error != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -94,40 +129,76 @@ func GetAllSheltersByID(c *fiber.Ctx) error {
 		})
 	}
 
-	// Fetch shelter account associated with the shelter info
-	var shelterData models.ShelterInfo
-	accountResult := middleware.DBConn.Where("shelter_id = ?", ShelterID).First(&shelterData)
+	// Fetch shelter media (profile and cover image)
+	type ShelterMedia struct {
+		ShelterProfile string `json:"shelter_profile"`
+		ShelterCover   string `json:"shelter_cover"`
+	}
+	var media ShelterMedia
+	imageResult := middleware.DBConn.
+		Table("sheltermedia").
+		Select("shelter_profile", "shelter_cover").
+		Where("shelter_id = ?", ShelterID).
+		Scan(&media)
 
-	if accountResult.Error != nil {
+	if imageResult.Error != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to fetch shelter info",
+			"message": "Failed to fetch shelter image",
 		})
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Shelter info retrieved successfully",
 		"data": fiber.Map{
-			"info": ShelterInfo,
+			"info":            ShelterInfo,
+			"shelter_profile": media.ShelterProfile,
+			"shelter_cover":   media.ShelterCover,
 		},
 	})
 }
 
 func GetShelter(c *fiber.Ctx) error {
-	// Create a slice to store all shelter
-	var shelter []models.ShelterInfo
+	// Create slices to store shelters and their media
+	var shelters []models.ShelterInfo
+	var sheltersMedia []models.ShelterMedia
 
-	// Fetch all shelter from the database
-	result := middleware.DBConn.Table("shelterinfo").Find(&shelter)
-
-	// Handle errors
-	if result.Error != nil {
+	// Fetch all shelters from the database
+	if err := middleware.DBConn.Table("shelterinfo").Find(&shelters).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Error retrieving pets",
+			"message": "Error retrieving shelters",
+			"error":   err.Error(),
 		})
 	}
 
-	// Return the list of pets
-	return c.JSON(shelter)
+	// Fetch all shelter media from the database
+	if err := middleware.DBConn.Table("sheltermedia").Find(&sheltersMedia).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error retrieving shelter media",
+			"error":   err.Error(),
+		})
+	}
+
+	// Create a map to quickly look up media by shelter ID
+	mediaMap := make(map[uint]models.ShelterMedia)
+	for _, media := range sheltersMedia {
+		mediaMap[media.ShelterID] = media
+	}
+
+	// Combine shelter info with their media
+	type ResponseShelter struct {
+		models.ShelterInfo
+		ShelterProfile string `json:"shelter_profile"`
+	}
+
+	var response []ResponseShelter
+	for _, shelter := range shelters {
+		response = append(response, ResponseShelter{
+			ShelterInfo:    shelter,
+			ShelterProfile: mediaMap[shelter.ShelterID].ShelterProfile,
+		})
+	}
+
+	return c.JSON(response)
 }
 
 type AdoptionRequest struct {

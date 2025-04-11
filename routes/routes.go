@@ -2,6 +2,7 @@ package routes
 
 import (
 	"pethub_api/controllers"
+	adopter "pethub_api/controllers/adopter"
 	shelter "pethub_api/controllers/shelter"
 
 	"github.com/gofiber/fiber/v2"
@@ -17,12 +18,12 @@ func AppRoutes(app *fiber.App) {
 	app.Delete("/admin/delete-account/:type/:id", controllers.DeleteAccount)
 
 	// Adopter Routes
-	app.Post("/user/register", controllers.RegisterAdopter)
-	app.Post("/user/login", controllers.LoginAdopter)    // Changed to POST for login
-	app.Get("/user", controllers.GetAllAdopters)         // Route to get all adopters
-	app.Get("/user/:id", controllers.GetAdopterInfoByID) // Route to get adopter by id
-	app.Get("/users/petinfo", controllers.GetAllPets)    // Route to get all pets // user view all pet
-	app.Get("/users/pets/:id", controllers.GetPetByID)   // Route to get pet by id
+	app.Post("/user/register", adopter.RegisterAdopter)
+	app.Post("/user/login", adopter.LoginAdopter)    // Changed to POST for login
+	app.Get("/user", adopter.GetAllAdopters)         // Route to get all adopters
+	app.Get("/user/:id", adopter.GetAdopterInfoByID) // Route to get adopter by id
+	app.Get("/users/petinfo", adopter.GetAllPets)    // Route to get all pets // user view all pet
+	app.Get("/users/pets/:id", adopter.GetPetByID)   // Route to get pet by id
 	app.Get("/user/:id/pet", shelter.GetAllPetsInfoByShelterID)
 
 	// Shelter
@@ -67,14 +68,14 @@ func AppRoutes(app *fiber.App) {
 	app.Put("/updateAdoptionAndQuestionnaire", controllers.UpdateAdoptionAndQuestionnaire)
 
 	app.Post("/shelter/:id/add-pet-info", shelter.AddPetInfo)
-	app.Get("/allshelter", controllers.GetShelter)
-	app.Get("/users/shelters/:id", controllers.GetAllSheltersByID) // shelters view all button
-	app.Get("/users/profile/:id", controllers.GetAdopterInfoByID)
-	app.Put("/users/:id/update-info", controllers.UpdateAdopterDetails)
-	app.Post("/users/:id/upload-media", controllers.UploadAdopterMedia)
+	app.Get("/allshelter", adopter.GetShelter)
+	app.Get("/users/shelters/:id", adopter.GetAllSheltersByID) // shelters view all button
+	app.Get("/users/profile/:id", adopter.GetAdopterInfoByID)
+	app.Put("/users/:id/update-info", adopter.UpdateAdopterDetails)
+	app.Post("/users/:id/upload-media", adopter.UploadAdopterMedia)
 
-	app.Get("/adopter/:id", controllers.GetAdopterProfile) // Route to upload or update adopter media// Route to get adopter media by ID
-	app.Put("/adopter/:id", controllers.EditAdopterProfile)
+	app.Get("/adopter/:id", adopter.GetAdopterProfile) // Route to upload or update adopter media// Route to get adopter media by ID
+	app.Put("/adopter/:id", adopter.EditAdopterProfile)
 
 	// pakyu
 }
