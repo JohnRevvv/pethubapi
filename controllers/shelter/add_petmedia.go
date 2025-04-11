@@ -1,64 +1,61 @@
 package controllers
 
-import (
-	"encoding/base64"
+// import (
+// 	"encoding/base64"
+// 	"io/ioutil"
+// 	"pethub_api/middleware"
+// 	"pethub_api/models"
+// 	"strconv"
 
-	"io/ioutil"
-	"pethub_api/middleware"
-	"pethub_api/models"
-	"strconv"
+// 	"github.com/gofiber/fiber/v2"
+// )
+// func AddPetMedia(c *fiber.Ctx) error {
+// 	petID := c.Params("id")
+// 	parsedPetID, err := strconv.ParseUint(petID, 10, 32)
+// 	if err != nil {
+// 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+// 			"message": "Invalid pet ID",
+// 		})
+// 	}
 
-	"github.com/gofiber/fiber/v2"
-)
+// 	imageFile, err := c.FormFile("pet_image_1")
+// 	if err != nil {
+// 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+// 			"message": "No image file uploaded",
+// 		})
+// 	}
 
-func AddPetMedia(c *fiber.Ctx) error {
-	petID := c.Params("id")
-	parsedPetID, err := strconv.ParseUint(petID, 10, 32)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Invalid pet ID",
-		})
-	}
+// 	fileContent, err := imageFile.Open()
+// 	if err != nil {
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"message": "Failed to open image file",
+// 		})
+// 	}
+// 	defer fileContent.Close()
 
-	var petMedia models.PetMedia
-	petMedia.PetID = uint(parsedPetID)
+// 	fileBytes, err := ioutil.ReadAll(fileContent)
+// 	if err != nil {
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"message": "Failed to read image file",
+// 		})
+// 	}
 
-	for i := 1; i <= 4; i++ {
-		imageFile, err := c.FormFile("pet_image_" + strconv.Itoa(i))
-		if err == nil {
-			fileContent, err := imageFile.Open()
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"message": "Failed to open pet image " + strconv.Itoa(i),
-				})
-			}
-			defer fileContent.Close()
+// 	encodedImage := base64.StdEncoding.EncodeToString(fileBytes)
 
-			fileBytes, err := ioutil.ReadAll(fileContent)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"message": "Failed to read pet image " + strconv.Itoa(i),
-				})
-			}
+// 	petMedia := models.PetMedia{
+// 		PetID:     uint(parsedPetID),
+// 		PetImage1: encodedImage,
+// 	}
 
-			encodedImage := base64.StdEncoding.EncodeToString(fileBytes)
+// 	if err := middleware.DBConn.Create(&petMedia).Error; err != nil {
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"message": "Failed to save pet media",
+// 			"error":   err.Error(),
+// 		})
+// 	}
 
-			switch i {
-			case 1:
-				petMedia.PetImage1 = encodedImage
-			}
-		}
-	}
-
-	if err := middleware.DBConn.Create(&petMedia).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to save pet media",
-			"error":   err.Error(),
-		})
-	}
-
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Pet media uploaded successfully",
-		"data":    petMedia,
-	})
-}
+// 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+// 		"message": "Pet media uploaded successfully",
+// 		"data":    petMedia,
+// 	})
+// }

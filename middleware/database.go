@@ -34,7 +34,8 @@ func ConnectDB() bool {
 	fmt.Println("Database connection established successfully")
 
 	// Auto-migrate models
-	DBConn.AutoMigrate(&models.AdopterAccount{},
+	DBConn.AutoMigrate(
+		&models.AdopterAccount{},
 		&models.AdopterInfo{},
 		&models.ShelterAccount{},
 		&models.ShelterInfo{},
@@ -42,6 +43,7 @@ func ConnectDB() bool {
 		&models.PetInfo{},
 		&models.PetMedia{},
 		&models.AdoptionApplication{},
-		&models.Questionnaires{})
+		&models.Questionnaires{},
+	)
 	return false
 }
