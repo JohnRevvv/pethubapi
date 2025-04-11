@@ -3,17 +3,17 @@ package controllers
 import (
 	"encoding/base64"
 	"errors"
-	"time"
-
+	"fmt"
 	"pethub_api/middleware"
 	"pethub_api/models"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
-// CreateAdopter creates an adopter account and info
+// RegisterAdopter creates an adopter account and info
 func RegisterAdopter(c *fiber.Ctx) error {
 	// Parse request body
 	requestBody := struct {
@@ -31,9 +31,37 @@ func RegisterAdopter(c *fiber.Ctx) error {
 		SocialMedia   string `json:"social_media"`
 	}{}
 
+	// Attempt to parse the incoming request body
 	if err := c.BodyParser(&requestBody); err != nil {
+		// Log the error to the server logs for debugging
+		fmt.Println("Error parsing request body:", err)
+
+		// Return a more specific error message depending on the field that fails
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "Invalid request body",
+			"error":   err.Error(), // Include the error message for debugging
+		})
+	}
+
+	// Additional checks for required fields
+	if requestBody.Username == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Missing required field: username",
+		})
+	}
+	if requestBody.Password == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Missing required field: password",
+		})
+	}
+	if requestBody.ContactNumber == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Missing required field: contact_number",
+		})
+	}
+	if requestBody.Email == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Missing required field: email",
 		})
 	}
 

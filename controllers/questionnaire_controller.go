@@ -1,10 +1,7 @@
 package controllers
 
 import (
-	"encoding/base64"
 	"fmt"
-	"io"
-	"mime/multipart"
 	"strings"
 
 	"pethub_api/middleware"
@@ -12,23 +9,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 )
-
-// Converts a file to base64 string
-func convertFileToBase64(file *multipart.FileHeader) (string, error) {
-	src, err := file.Open()
-	if err != nil {
-		return "", fmt.Errorf("failed to open uploaded file: %v", err)
-	}
-	defer src.Close()
-
-	buf := make([]byte, file.Size)
-	if _, err := io.ReadFull(src, buf); err != nil {
-		return "", fmt.Errorf("failed to read uploaded file: %v", err)
-	}
-
-	encoded := base64.StdEncoding.EncodeToString(buf)
-	return encoded, nil
-}
 
 // CreateQuestionnaire handles the form submission and uploads
 func CreateQuestionnaire(c *fiber.Ctx) error {
@@ -69,7 +49,7 @@ func CreateQuestionnaire(c *fiber.Ctx) error {
 	var homePhotoBase64s []string
 	if files, ok := form.File["home_photos"]; ok {
 		for _, file := range files {
-			encoded, err := convertFileToBase64(file)
+			encoded, err := middleware.ConvertFileToBase64(file)
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 					"error":   "Failed to encode home photo",
@@ -83,7 +63,7 @@ func CreateQuestionnaire(c *fiber.Ctx) error {
 	// Handle valid_id file as base64
 	var validIDBase64 string
 	if file, err := c.FormFile("valid_id"); err == nil {
-		encoded, err := convertFileToBase64(file)
+		encoded, err := middleware.ConvertFileToBase64(file)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error":   "Failed to encode ID proof",
@@ -102,30 +82,28 @@ func CreateQuestionnaire(c *fiber.Ctx) error {
 	}
 
 	questionnaire := models.Questionnaires{
-		ApplicationID:            stringToUint(applicationID),
-		PetType:                  petType,
-		SpecificShelterAnimal:    yesNo(c.FormValue("specific_shelter_animal")),
-		IdealPetDescription:      c.FormValue("ideal_pet_description"),
-		BuildingType:             c.FormValue("building_type"),
-		Rent:                     yesNo(c.FormValue("rent")),
-		PetMovePlan:              c.FormValue("pet_move_plan"),
-		HouseholdComposition:     c.FormValue("household_composition"),
-		AllergiesToAnimals:       yesNo(c.FormValue("allergies_to_animals")),
-		CareResponsibility:       c.FormValue("care_responsibility"),
-		FinancialResponsibility:  c.FormValue("financial_responsibility"),
-		VacationCarePlan:         c.FormValue("vacation_care_plan"),
-		AloneTime:                c.FormValue("alone_time"),
-		IntroductionPlan:         c.FormValue("introduction_plan"),
-		FamilySupport:            yesNo(c.FormValue("family_support")),
-		FamilySupportExplanation: c.FormValue("family_support_explanation"),
-		OtherPets:                yesNo(c.FormValue("other_pets")),
-		PastPets:                 yesNo(c.FormValue("past_pets")),
-		IDProof:                  c.FormValue("id_proof"),
-		ZoomInterviewDate:        c.FormValue("zoom_interview_date"),
-		ZoomInterviewTime:        c.FormValue("zoom_interview_time"),
-		ShelterVisit:             yesNo(c.FormValue("shelter_visit")),
-		HomePhotos:               strings.Join(homePhotoBase64s, ","), // Joined base64 images
-		ValidID:                  validIDBase64,                       // Base64 ID proof
+		ApplicationID:             stringToUint(applicationID),
+		PetType:                   petType,
+		SpecificShelterAnimal:     yesNo(c.FormValue("specific_shelter_animal")),
+		IdealPetDescription:       c.FormValue("ideal_pet_description"),
+		BuildingType:              c.FormValue("building_type"),
+		Rent:                      yesNo(c.FormValue("rent")),
+		PetMovePlan:               c.FormValue("pet_move_plan"),
+		HouseholdComposition:      c.FormValue("household_composition"),
+		AllergiesToAnimals:        yesNo(c.FormValue("allergies_to_animals")),
+		CareResponsibility:        c.FormValue("care_responsibility"),
+		FinancialResponsibility:   c.FormValue("financial_responsibility"),
+		VacationCarePlan:          c.FormValue("vacation_care_plan"),
+		AloneTime:                 c.FormValue("alone_time"),
+		IntroductionPlan:          c.FormValue("introduction_plan"),
+		FamilySupport:             yesNo(c.FormValue("family_support")),
+		FamilySupportExplanation:  c.FormValue("family_support_explanation"),
+		OtherPets:                 yesNo(c.FormValue("other_pets")),
+		PastPets:                  yesNo(c.FormValue("past_pets")),
+		IDProof:                   c.FormValue("id_proof"),
+		PreferredInterviewSetting: c.FormValue("preferred_interview_setting"),
+		HomePhotos:                strings.Join(homePhotoBase64s, ","), // Joined base64 images
+		ValidID:                   validIDBase64,                       // Base64 ID proof
 	}
 
 	// Save to database

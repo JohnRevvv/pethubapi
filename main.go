@@ -9,7 +9,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/session"
 )
+
+var store *session.Store
 
 func init() {
 	fmt.Println("STARTING SERVER...")
@@ -25,12 +28,22 @@ func init() {
 			fmt.Println("Migration successful!")
 		}
 	}
+
+	// Initialize session store
+	store = session.New(session.Config{
+		CookieHTTPOnly: true,
+		CookieSecure:   false, // Set to true in production with HTTPS
+		CookieSameSite: "Lax",
+	})
 }
 
 func main() {
 	app := fiber.New(fiber.Config{
 		AppName: middleware.GetEnv("PROJ_NAME"),
 	})
+
+	// Make session store accessible in middleware
+	middleware.SessionStore = store
 
 	// CORS CONFIG
 	app.Use(cors.New(cors.Config{
@@ -42,8 +55,17 @@ func main() {
 	// LOGGER
 	app.Use(logger.New())
 
+	// SESSION middleware to attach session object to context
+	app.Use(func(c *fiber.Ctx) error {
+		sess, err := middleware.SessionStore.Get(c)
+		if err != nil {
+			return c.Status(500).SendString("Session error")
+		}
+		c.Locals("session", sess)
+		return c.Next()
+	})
+
 	// API ROUTES
-	// Do not remove this endpoint
 	app.Get("/favicon.ico", func(c *fiber.Ctx) error {
 		return c.SendStatus(204) // No Content
 	})

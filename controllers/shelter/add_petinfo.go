@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/base64"
 	"io"
+	"pethub_api/middleware"
 	"pethub_api/models"
 	"strconv"
 
@@ -21,7 +22,7 @@ func AddPetInfo(c *fiber.Ctx) error {
 	}
 
 	// Safe conversion from int to uint
-	pet := models.PetInfo{ShelterID: uint(parsedShelterID)}
+	pet := models.PetInfo{ShelterID: uint(shelterID)}
 
 	// Parse request body
 	if err := c.BodyParser(&pet); err != nil {
@@ -62,29 +63,27 @@ func AddPetInfo(c *fiber.Ctx) error {
 	}
 
 	// Save pet to database
-	if err := DBConn.Create(&pet).Error; err != nil {
+	if err := middleware.DBConn.Create(&pet).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Failed to add pet",
 		})
 	}
 
 	// Process Images
-	petMedia := models.PetMedia{PetID: petInfo.PetID}
-	petMedia.PetImage1 = processImage(c, "pet_image1", requestBody.PetImage1)
+	petMedia := models.PetMedia{PetID: pet.PetID}
+	petMedia.PetImage1 = processImage(c, "pet_image1", "")
 
-	if err := tx.Create(&petMedia).Error; err != nil {
-		tx.Rollback()
+	// Save media to database
+	if err := middleware.DBConn.Create(&petMedia).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Failed to add pet media",
 		})
 	}
 
-	tx.Commit()
-
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Pet added successfully",
 		"data": fiber.Map{
-			"pet_info": petInfo,
+			"pet_info": pet,
 			"image":    petMedia,
 		},
 	})

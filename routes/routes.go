@@ -10,7 +10,11 @@ import (
 func AppRoutes(app *fiber.App) {
 
 	// Admin Routes
-	app.Post("/admin/register", controllers.RegisterAdmin) // Route to register an admin
+	app.Post("/admin/register", controllers.RegisterAdmin)
+	app.Post("/admin/login", controllers.AdminLogin)
+	app.Get("/admin/view-all-accounts", controllers.ViewAllAccounts)
+	app.Put("/admin/update-status/:type/:id", controllers.UpdateAccountStatus)
+	app.Delete("/admin/delete-account/:type/:id", controllers.DeleteAccount)
 
 	// Adopter Routes
 	app.Post("/user/register", controllers.RegisterAdopter)
@@ -53,6 +57,9 @@ func AppRoutes(app *fiber.App) {
 	// Route for getting both adoption application and questionnaire form by adopter_id
 	app.Get("/adoption-and-questionnaire/:adopter_id", controllers.GetAdoptionApplicationAndQuestionnaire)
 
+	// Define the route for updating adoption and questionnaire
+	app.Put("/updateAdoptionAndQuestionnaire", controllers.UpdateAdoptionAndQuestionnaire)
+
 	app.Post("/shelter/:id/add-pet-info", shelter.AddPetInfo)
 	app.Get("/allshelter", controllers.GetShelter)
 	app.Get("/users/shelters/:id", controllers.GetAllSheltersByID) // shelters view all button
@@ -62,4 +69,5 @@ func AppRoutes(app *fiber.App) {
 
 	app.Get("/adopter/:id", controllers.GetAdopterProfile) // Route to upload or update adopter media// Route to get adopter media by ID
 	app.Put("/adopter/:id", controllers.EditAdopterProfile)
+
 }

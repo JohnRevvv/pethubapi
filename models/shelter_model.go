@@ -7,7 +7,10 @@ type ShelterAccount struct {
 	ShelterID uint   `gorm:"primaryKey" json:"shelter_id"`
 	Username  string `gorm:"unique;not null" json:"username"`
 	Password  string `json:"password"`
+	Status    string `json:"status"`     // Status can be "Active", "Pending", "Declined", etc.
+	RegStatus string `json:"reg_status"` // Registration status can be "Pending", "Approved", etc.
 	CreatedAt time.Time
+
 	//Info      ShelterInfo `gorm:"foreignKey:ShelterID;constraint:OnDelete:CASCADE" json:"info"`
 }
 
