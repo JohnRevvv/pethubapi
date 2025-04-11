@@ -439,5 +439,3 @@ func DeletePetInfo(c *fiber.Ctx) error {
 		Data:    nil,
 	})
 }
-
-
