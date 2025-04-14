@@ -36,6 +36,7 @@ func AppRoutes(app *fiber.App) {
 	app.Get("/shelter/archive/pets/:id/search", controllers.FetchAndSearchArchivedPets) // Route to get archived pets
 	app.Get("/shelter/:id/petcount", controllers.CountPetsByShelter) // Route to get pet count by shelter ID
 
+
 	app.Post("/shelter/:id/add-pet-info", controllers.AddPetInfo)
 	app.Get("/allshelter", controllers.GetShelter)
 	app.Get("/users/shelters/:id", controllers.GetAllSheltersByID) // shelters view all button
@@ -46,4 +47,13 @@ func AppRoutes(app *fiber.App) {
 	app.Get("/adopter/:id", controllers.GetAdopterProfile) // Route to upload or update adopter media// Route to get adopter media by ID
 	app.Put("/adopter/:id", controllers.EditAdopterProfile)
 
+	//FORGOT PASSWORD
+	app.Post("/shelter/forgot-password", controllers.ShelterForgotPassword) // Route to handle forgot password
+	app.Post("/shelter/verify-code", controllers.ShelterVerifyResetCode)       // Route to verify code
+	app.Post("/shelter/reset-password", controllers.ShelterResetPassword) // Route to reset password
+
+	app.Post("/adopter/forgot-password", controllers.AdopterForgotPassword) // Route to handle forgot password
+	app.Post("/adopter/verify-code", controllers.AdopterVerifyResetCode)       // Route to verify code
+	app.Post("/adopter//reset-password", controllers.AdopterResetPassword) // Route to reset password
+	
 }
