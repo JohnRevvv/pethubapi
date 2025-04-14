@@ -576,3 +576,31 @@ func GetShelterByName(c *fiber.Ctx) error {
 		},
 	})
 }
+
+
+//For Data Analytics
+func CountPetsByShelter(c *fiber.Ctx) error {
+	shelterID := c.Params("id")
+
+	// Check if shelter exists
+	var shelterInfo models.ShelterInfo
+	if err := middleware.DBConn.Where("shelter_id = ?", shelterID).First(&shelterInfo).Error; err != nil {
+		return c.Status(400).JSON(fiber.Map{"message": "Shelter not found"})
+	}
+
+	var available, pending, adopted int64
+
+	middleware.DBConn.Debug().Model(&models.PetInfo{}).Where("shelter_id = ? AND status = ?", shelterID, "available").Count(&available)
+	middleware.DBConn.Model(&models.PetInfo{}).Where("shelter_id = ? AND status = ?", shelterID, "pending").Count(&pending)
+	middleware.DBConn.Model(&models.PetInfo{}).Where("shelter_id = ? AND status = ?", shelterID, "adopted").Count(&adopted)
+
+	return c.Status(200).JSON(fiber.Map{
+		"message": "Counts fetched successfully",
+		"data": fiber.Map{
+			"shelter_id": shelterID,
+			"available":  available,
+			"pending":    pending,
+			"adopted":    adopted,
+		},
+	})
+}

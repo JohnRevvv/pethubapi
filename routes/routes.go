@@ -34,6 +34,7 @@ func AppRoutes(app *fiber.App) {
 	app.Put("/shelter/:id/unarchive-pet", controllers.SetPetStatusToUnarchive) // Route to unarchive pet info
 	app.Get("/filter/:id/pets/search", controllers.FetchAndSearchPets) // Route to search pets by name
 	app.Get("/shelter/archive/pets/:id/search", controllers.FetchAndSearchArchivedPets) // Route to get archived pets
+	app.Get("/shelter/:id/petcount", controllers.CountPetsByShelter) // Route to get pet count by shelter ID
 
 	app.Post("/shelter/:id/add-pet-info", controllers.AddPetInfo)
 	app.Get("/allshelter", controllers.GetShelter)
