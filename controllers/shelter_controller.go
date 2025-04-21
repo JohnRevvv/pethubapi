@@ -620,10 +620,12 @@ func ShelterChangePassword(c *fiber.Ctx) error {
 			Data:    nil,
 		})
 	}
-	// Parse request body
+
+	// Parse request body with confirm password
 	requestBody := struct {
-		OldPassword string `json:"old_password"`
-		NewPassword string `json:"new_password"`
+		OldPassword     string `json:"old_password"`
+		NewPassword     string `json:"new_password"`
+		ConfirmPassword string `json:"confirm_password"`
 	}{}
 	if err := c.BodyParser(&requestBody); err != nil {
 		return c.JSON(response.ShelterResponseModel{
@@ -632,6 +634,16 @@ func ShelterChangePassword(c *fiber.Ctx) error {
 			Data:    nil,
 		})
 	}
+
+	// Check if new and confirm passwords match
+	if requestBody.NewPassword != requestBody.ConfirmPassword {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "400",
+			Message: "New password and confirm password do not match",
+			Data:    nil,
+		})
+	}
+
 	// Check if old password matches
 	err := bcrypt.CompareHashAndPassword([]byte(shelterAccount.Password), []byte(requestBody.OldPassword))
 	if err != nil {
@@ -641,6 +653,7 @@ func ShelterChangePassword(c *fiber.Ctx) error {
 			Data:    nil,
 		})
 	}
+
 	// Hash the new password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(requestBody.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
@@ -650,6 +663,7 @@ func ShelterChangePassword(c *fiber.Ctx) error {
 			Data:    nil,
 		})
 	}
+
 	// Update the password in the database
 	shelterAccount.Password = string(hashedPassword)
 	if err := middleware.DBConn.Save(&shelterAccount).Error; err != nil {
@@ -659,6 +673,7 @@ func ShelterChangePassword(c *fiber.Ctx) error {
 			Data:    nil,
 		})
 	}
+
 	return c.JSON(response.ShelterResponseModel{
 		RetCode: "200",
 		Message: "Password updated successfully",

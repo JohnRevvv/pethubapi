@@ -21,16 +21,16 @@ func AppRoutes(app *fiber.App) {
 	app.Post("/user/login", controllers.LoginAdopter)
 	app.Get("/user", controllers.GetAllAdopters)
 	app.Get("/user/:id", controllers.GetAdopterInfoByID)
-	app.Get("/users/petinfo", controllers.GetAllPets)
-	app.Get("/users/pets/:id", controllers.GetPetByID)
-	app.Get("/user/:id/pet", controllers.GetAllPetsInfoByShelterID)
-
 	app.Get("/users/profile/:id", controllers.GetAdopterInfoByID)
 	app.Put("/users/:id/update-info", controllers.UpdateAdopterDetails)
 	app.Post("/users/:id/upload-media", controllers.UploadAdopterMedia)
-
 	app.Get("/adopter/:id", controllers.GetAdopterProfile)
 	app.Put("/adopter/:id", controllers.EditAdopterProfile)
+
+	// Adopter - Pet Related
+	app.Get("/users/petinfo", controllers.GetAllPets)
+	app.Get("/users/pets/:id", controllers.GetPetByID)
+	app.Get("/user/:id/pet", controllers.GetAllPetsInfoByShelterID)
 
 	// ---------------- Shelter Routes ----------------
 	app.Post("/shelter/register", controllers.RegisterShelter)
@@ -40,14 +40,14 @@ func AppRoutes(app *fiber.App) {
 	app.Get("/shelter/:id", controllers.GetShelterInfoByID)
 	app.Put("/shelter/:id/update-info", controllers.UpdateShelterDetails)
 	app.Post("/shelter/:id/upload-media", controllers.UploadShelterMedia)
+	app.Post("/shelter/:id/add-pet-info", controllers.AddPetInfo)
 	app.Get("/shelter/:id/petinfo", controllers.GetPetInfoByPetID)
 	app.Put("/shelter/:id/update-pet-info", controllers.UpdatePetInfo)
 	app.Put("/shelter/:id/archive-pet", controllers.SetPetStatusToArchive)
 	app.Put("/shelter/:id/unarchive-pet", controllers.SetPetStatusToUnarchive)
+	app.Get("/shelter/:id/petcount", controllers.CountPetsByShelter)
 	app.Get("/filter/:id/pets/search", controllers.FetchAndSearchPets)
 	app.Get("/shelter/archive/pets/:id/search", controllers.FetchAndSearchArchivedPets)
-	app.Get("/shelter/:id/petcount", controllers.CountPetsByShelter)
-	app.Post("/shelter/:id/add-pet-info", controllers.AddPetInfo)
 	app.Get("/shelter/:id/get/donationinfo", controllers.GetShelterDonationInfo)
 	app.Put("/shelter/:id/update/donationinfo", controllers.UpdateShelterDonations)
 	app.Put("/shelter/:id/change-password", controllers.ShelterChangePassword)
