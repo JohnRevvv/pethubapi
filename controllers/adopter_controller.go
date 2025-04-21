@@ -164,46 +164,46 @@ func LoginAdopter(c *fiber.Ctx) error {
 	})
 }
 
-func GetAllAdopters(c *fiber.Ctx) error {
-	// Fetch all adopter accounts
-	var adopterAccounts []models.AdopterAccount
-	accountResult := middleware.DBConn.Find(&adopterAccounts)
+// func GetAllAdopters(c *fiber.Ctx) error {
+// 	// Fetch all adopter accounts
+// 	var adopterAccounts []models.AdopterAccount
+// 	accountResult := middleware.DBConn.Find(&adopterAccounts)
 
-	if accountResult.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to fetch adopter accounts",
-		})
-	}
+// 	if accountResult.Error != nil {
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"message": "Failed to fetch adopter accounts",
+// 		})
+// 	}
 
-	// Fetch all adopter info
-	var adopterInfos []models.AdopterInfo
-	infoResult := middleware.DBConn.Find(&adopterInfos)
+// 	// Fetch all adopter info
+// 	var adopterInfos []models.AdopterInfo
+// 	infoResult := middleware.DBConn.Find(&adopterInfos)
 
-	if infoResult.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to fetch adopter info",
-		})
-	}
+// 	if infoResult.Error != nil {
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"message": "Failed to fetch adopter info",
+// 		})
+// 	}
 
-	// Combine accounts and info into a single response
-	adopters := []fiber.Map{}
-	for _, account := range adopterAccounts {
-		for _, info := range adopterInfos {
-			if account.AdopterID == info.AdopterID {
-				adopters = append(adopters, fiber.Map{
-					"adopter": account,
-					"info":    info,
-				})
-				break
-			}
-		}
-	}
+// 	// Combine accounts and info into a single response
+// 	adopters := []fiber.Map{}
+// 	for _, account := range adopterAccounts {
+// 		for _, info := range adopterInfos {
+// 			if account.AdopterID == info.AdopterID {
+// 				adopters = append(adopters, fiber.Map{
+// 					"adopter": account,
+// 					"info":    info,
+// 				})
+// 				break
+// 			}
+// 		}
+// 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Adopters retrieved successfully",
-		"data":    adopters,
-	})
-}
+// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+// 		"message": "Adopters retrieved successfully",
+// 		"data":    adopters,
+// 	})
+// }
 
 func GetAdopterInfoByID(c *fiber.Ctx) error {
 	adopterID := c.Params("id")

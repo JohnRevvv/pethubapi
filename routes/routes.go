@@ -2,65 +2,66 @@ package routes
 
 import (
 	"pethub_api/controllers"
-	// shelter "pethub_api/controllers/shelter"
-
 	"github.com/gofiber/fiber/v2"
 )
 
 func AppRoutes(app *fiber.App) {
-	// Admin
-	app.Post("/admin/register", controllers.RegisterAdmin) // Route to register an admin
-	app.Post("/admin/login", controllers.LoginAdmin)                          // Route to login an admin
-	app.Get("/admin/getallpendingrequest", controllers.GetAllPendingRequests) // Route to get all pending req
-	app.Get("/admin/getalladopters", controllers.GetAllAdopters)              // Route to get all adopters
-	app.Get("/admin/getallshelters", controllers.GetAllShelters)              // Route to get all shelters
-	app.Post("/admin/updateregstatus", controllers.UpdateRegistrationStatus)  // Route to approve a shelter
-	app.Post("/admin/updateshelterstatus", controllers.UpdateShelterStatus)   // Route to block or unblock shelter
-	app.Post("/admin/updateadopterstatus", controllers.UpdateAdopterStatus)   // Route to block or unblock adopter
+	// ---------------- Admin Routes ----------------
+	app.Post("/admin/register", controllers.RegisterAdmin)
+	app.Post("/admin/login", controllers.LoginAdmin)
+	app.Get("/admin/getallpendingrequest", controllers.GetAllPendingRequests)
+	app.Get("/admin/getalladopters", controllers.GetAllAdopters)
+	app.Get("/admin/getallshelters", controllers.GetAllShelters)
+	app.Post("/admin/updateregstatus", controllers.UpdateRegistrationStatus)
+	app.Post("/admin/updateshelterstatus", controllers.UpdateShelterStatus)
+	app.Post("/admin/updateadopterstatus", controllers.UpdateAdopterStatus)
 
-	// Adopter
+	// ---------------- Adopter Routes ----------------
 	app.Post("/user/register", controllers.RegisterAdopter)
-	app.Post("/user/login", controllers.LoginAdopter)    // Changed to POST for login
-	app.Get("/user", controllers.GetAllAdopters)         // Route to get all adopters
-	app.Get("/user/:id", controllers.GetAdopterInfoByID) // Route to get adopter by id
-	app.Get("/users/petinfo", controllers.GetAllPets)    // Route to get all pets // user view all pet
-	app.Get("/users/pets/:id", controllers.GetPetByID)   // Route to get pet by id
-	app.Get("/user/:id/pet", controllers.GetAllPetsInfoByShelterID) 
+	app.Post("/user/login", controllers.LoginAdopter)
+	app.Get("/user", controllers.GetAllAdopters)
+	app.Get("/user/:id", controllers.GetAdopterInfoByID)
+	app.Get("/users/petinfo", controllers.GetAllPets)
+	app.Get("/users/pets/:id", controllers.GetPetByID)
+	app.Get("/user/:id/pet", controllers.GetAllPetsInfoByShelterID)
 
-	// Shelter
-	app.Post("/shelter/register", controllers.RegisterShelter)            // Route to register a shelter
-	app.Post("/shelter/login", controllers.LoginShelter)                  // Changed to POST for login 
-	app.Get("/shelters", controllers.GetAllShelters)                  // Route to get all shelters
-	app.Get("/shelter", controllers.GetShelterByName)                 // Route to get shelter by name
-	app.Get("/shelter/:id", controllers.GetShelterInfoByID)               // Route to get shelter by ID
-	app.Put("/shelter/:id/update-info", controllers.UpdateShelterDetails) // Route to update shelter details
-	app.Post("/shelter/:id/upload-media", controllers.UploadShelterMedia) // Route to upload or update shelter media
-	app.Get("/shelter/:id/petinfo", controllers.GetPetInfoByPetID) // Route to get shelter media by ID
-	app.Put("/shelter/:id/update-pet-info", controllers.UpdatePetInfo) // Route to update pet info
-	app.Put("/shelter/:id/archive-pet", controllers.SetPetStatusToArchive) // Route to archive pet info
-	app.Put("/shelter/:id/unarchive-pet", controllers.SetPetStatusToUnarchive) // Route to unarchive pet info
-	app.Get("/filter/:id/pets/search", controllers.FetchAndSearchPets) // Route to search pets by name
-	app.Get("/shelter/archive/pets/:id/search", controllers.FetchAndSearchArchivedPets) // Route to get archived pets
-	app.Get("/shelter/:id/petcount", controllers.CountPetsByShelter) // Route to get pet count by shelter ID
-
-
-	app.Post("/shelter/:id/add-pet-info", controllers.AddPetInfo)
-	app.Get("/allshelter", controllers.GetShelter)
-	app.Get("/users/shelters/:id", controllers.GetAllSheltersByID) // shelters view all button
 	app.Get("/users/profile/:id", controllers.GetAdopterInfoByID)
 	app.Put("/users/:id/update-info", controllers.UpdateAdopterDetails)
 	app.Post("/users/:id/upload-media", controllers.UploadAdopterMedia)
 
-	app.Get("/adopter/:id", controllers.GetAdopterProfile) // Route to upload or update adopter media// Route to get adopter media by ID
+	app.Get("/adopter/:id", controllers.GetAdopterProfile)
 	app.Put("/adopter/:id", controllers.EditAdopterProfile)
 
-	//FORGOT PASSWORD
-	app.Post("/shelter/forgot-password", controllers.ShelterForgotPassword) // Route to handle forgot password
-	app.Post("/shelter/verify-code", controllers.ShelterVerifyResetCode)       // Route to verify code
-	app.Post("/shelter/reset-password", controllers.ShelterResetPassword) // Route to reset password
+	// ---------------- Shelter Routes ----------------
+	app.Post("/shelter/register", controllers.RegisterShelter)
+	app.Post("/shelter/login", controllers.LoginShelter)
+	app.Get("/shelters", controllers.GetAllShelters)
+	app.Get("/shelter", controllers.GetShelterByName)
+	app.Get("/shelter/:id", controllers.GetShelterInfoByID)
+	app.Put("/shelter/:id/update-info", controllers.UpdateShelterDetails)
+	app.Post("/shelter/:id/upload-media", controllers.UploadShelterMedia)
+	app.Get("/shelter/:id/petinfo", controllers.GetPetInfoByPetID)
+	app.Put("/shelter/:id/update-pet-info", controllers.UpdatePetInfo)
+	app.Put("/shelter/:id/archive-pet", controllers.SetPetStatusToArchive)
+	app.Put("/shelter/:id/unarchive-pet", controllers.SetPetStatusToUnarchive)
+	app.Get("/filter/:id/pets/search", controllers.FetchAndSearchPets)
+	app.Get("/shelter/archive/pets/:id/search", controllers.FetchAndSearchArchivedPets)
+	app.Get("/shelter/:id/petcount", controllers.CountPetsByShelter)
+	app.Post("/shelter/:id/add-pet-info", controllers.AddPetInfo)
+	app.Get("/shelter/:id/get/donationinfo", controllers.GetShelterDonationInfo)
+	app.Put("/shelter/:id/update/donationinfo", controllers.UpdateShelterDonations)
+	app.Put("/shelter/:id/change-password", controllers.ShelterChangePassword)
 
-	app.Post("/adopter/forgot-password", controllers.AdopterForgotPassword) // Route to handle forgot password
-	app.Post("/adopter/verify-code", controllers.AdopterVerifyResetCode)       // Route to verify code
-	app.Post("/adopter//reset-password", controllers.AdopterResetPassword) // Route to reset password
-	
+	// ---------------- General Shared Routes ----------------
+	app.Get("/allshelter", controllers.GetShelter)
+	app.Get("/users/shelters/:id", controllers.GetAllSheltersByID)
+
+	// ---------------- Forgot Password ----------------
+	app.Post("/shelter/forgot-password", controllers.ShelterForgotPassword)
+	app.Post("/shelter/verify-code", controllers.ShelterVerifyResetCode)
+	app.Post("/shelter/reset-password", controllers.ShelterResetPassword)
+
+	app.Post("/adopter/forgot-password", controllers.AdopterForgotPassword)
+	app.Post("/adopter/verify-code", controllers.AdopterVerifyResetCode)
+	app.Post("/adopter/reset-password", controllers.AdopterResetPassword)
 }
