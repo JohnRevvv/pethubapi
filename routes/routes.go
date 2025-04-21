@@ -10,6 +10,13 @@ import (
 func AppRoutes(app *fiber.App) {
 	// Admin
 	app.Post("/admin/register", controllers.RegisterAdmin) // Route to register an admin
+	app.Post("/admin/login", controllers.LoginAdmin)                          // Route to login an admin
+	app.Get("/admin/getallpendingrequest", controllers.GetAllPendingRequests) // Route to get all pending req
+	app.Get("/admin/getalladopters", controllers.GetAllAdopters)              // Route to get all adopters
+	app.Get("/admin/getallshelters", controllers.GetAllShelters)              // Route to get all shelters
+	app.Post("/admin/updateregstatus", controllers.UpdateRegistrationStatus)  // Route to approve a shelter
+	app.Post("/admin/updateshelterstatus", controllers.UpdateShelterStatus)   // Route to block or unblock shelter
+	app.Post("/admin/updateadopterstatus", controllers.UpdateAdopterStatus)   // Route to block or unblock adopter
 
 	// Adopter
 	app.Post("/user/register", controllers.RegisterAdopter)
