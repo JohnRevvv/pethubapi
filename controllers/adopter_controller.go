@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/base64"
 	"errors"
+	"strconv"
 	"time"
 
 	"pethub_api/middleware"
@@ -244,16 +245,237 @@ func GetAdopterInfoByID(c *fiber.Ctx) error {
 
 		// Include decoded images in the response
 		mediaResponse = fiber.Map{
-			"shelter_profile": decodedProfile,
+			"adopter_profile": decodedProfile,
 		}
 	}
 
 	// Combine shelter info and media into a single response
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Shelter info retrieved successfully",
+		"message": "Adopter info retrieved successfully",
 		"data": fiber.Map{
 			"info":  adopterInfo,
 			"media": mediaResponse,
+		},
+	})
+}
+
+func AddPetAdoption(c *fiber.Ctx) error {
+	// Get adopter ID from route param
+	adopterIDParam := c.Params("id")
+	adopterID, err := strconv.ParseUint(adopterIDParam, 10, 32)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid adopter ID",
+		})
+	}
+
+	// Parse pet_id from JSON body
+	var body struct {
+		PetID uint `json:"pet_id"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid request body",
+		})
+	}
+
+	// Validate Adopter exists
+	var adopter models.AdopterInfo
+	if err := middleware.DBConn.First(&adopter, uint(adopterID)).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"message": "Adopter not found",
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Database error while fetching adopter",
+		})
+	}
+
+	// Validate Pet exists
+	var pet models.PetInfo
+	if err := middleware.DBConn.First(&pet, body.PetID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"message": "Pet not found",
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Database error while fetching pet",
+		})
+	}
+
+	// Save to AdoptedPets table (prevent duplicate entry)
+	adoptedPet := models.AdoptedPet{
+		AdopterID: adopter.AdopterID,
+		PetID:     pet.PetID,
+	}
+
+	if err := middleware.DBConn.
+		Where("adopter_id = ? AND pet_id = ?", adoptedPet.AdopterID, adoptedPet.PetID).
+		FirstOrCreate(&adoptedPet).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to record adoption",
+			"error":   err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "Pet successfully adopted",
+		"data":    adoptedPet,
+	})
+}
+
+func GetPetsByAdopterID(c *fiber.Ctx) error {
+	// Retrieve the adopter ID from the URL parameter
+	idParam := c.Params("id")
+	if idParam == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Adopter ID parameter is missing",
+		})
+	}
+
+	adopterID, err := strconv.Atoi(idParam)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid adopter ID",
+		})
+	}
+
+	// Fetch all adopted pets for the adopter
+	var adoptedPets []struct {
+		AdoptedID uint   `json:"adopted_id"`
+		PetID     uint   `json:"pet_id"`
+		PetName   string `json:"pet_name"`
+		PetAge    int    `json:"pet_age"`
+		AgeType   string `json:"age_type"`
+		PetSex    string `json:"pet_sex"`
+		PetType   string `json:"pet_type"`
+		Status    string `json:"status"`
+		PetImage1 string `json:"pet_image1"`
+	}
+
+	// Query the database
+	if err := middleware.DBConn.Table("adopterpets").
+		Select("adopterpets.adopted_id, adopterpets.pet_id, petinfo.pet_name, petinfo.pet_age, petinfo.age_type, petinfo.pet_sex, petinfo.pet_type, petinfo.status, petmedia.pet_image1").
+		Joins("JOIN petinfo ON adopterpets.pet_id = petinfo.pet_id").
+		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
+		Where("adopterpets.adopter_id = ?", adopterID).
+		Scan(&adoptedPets).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to fetch adopted pets",
+			"details": err.Error(),
+		})
+	}
+
+	// Check if no pets were found
+	if len(adoptedPets) == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No adopted pets found for the specified adopter ID",
+		})
+	}
+
+	// Return the adopted pets with their information
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Adopted pets retrieved successfully",
+		"data":    adoptedPets,
+	})
+}
+
+func GetAllPetsInfoByShelterID(c *fiber.Ctx) error {
+	shelterID := c.Params("id")
+
+	// Fetch pet information by shelter ID with pet_image1 from petmedia
+	var petInfo []struct {
+		PetID          uint      `json:"pet_id"`
+		ShelterID      uint      `json:"shelter_id"`
+		PetName        string    `json:"pet_name"`
+		PetAge         uint      `json:"pet_age"`
+		PetSex         string    `json:"pet_sex"`
+		PetDescription string    `json:"pet_descriptions"`
+		Status         string    `json:"status"`
+		CreatedAt      time.Time `json:"created_at"`
+		PetType        *string   `json:"pet_type"`
+		PetImage1      *string   `json:"pet_image1"`
+	}
+
+	// Query the database with a join
+	infoResult := middleware.DBConn.Table("petinfo").
+		Select("petinfo.pet_id, petinfo.shelter_id, petinfo.pet_name, petinfo.pet_age, petinfo.pet_sex, petinfo.pet_descriptions, petinfo.status, petinfo.created_at, petinfo.pet_type, petmedia.pet_image1").
+		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
+		Where("petinfo.shelter_id = ?", shelterID).
+		Scan(&petInfo)
+
+	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) || len(petInfo) == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No pets found for the specified shelter ID",
+		})
+	} else if infoResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Database error",
+			"error":   infoResult.Error.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Pets retrieved successfully",
+		"data":    petInfo,
+	})
+}
+
+func GetShelterWithPetsByID(c *fiber.Ctx) error {
+	// Retrieve the shelter ID from the URL parameter
+	shelterID := c.Params("id")
+	if shelterID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Shelter ID parameter is missing",
+		})
+	}
+
+	// Fetch shelter information by shelter ID
+	var shelterInfo struct {
+		models.ShelterInfo
+		ShelterCover   *string `json:"shelter_cover"`
+		ShelterProfile *string `json:"shelter_profile"`
+	}
+	if err := middleware.DBConn.Table("shelterinfo").
+		Select("shelterinfo.*, sheltermedia.shelter_cover, sheltermedia.shelter_profile").
+		Joins("LEFT JOIN sheltermedia ON shelterinfo.shelter_id = sheltermedia.shelter_id").
+		Where("shelterinfo.shelter_id = ?", shelterID).
+		Scan(&shelterInfo).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"message": "Shelter not found",
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Database error while fetching shelter info",
+			"error":   err.Error(),
+		})
+	}
+
+	// Fetch pets under the shelter by shelter ID
+	var pets []struct {
+		models.PetInfo
+		PetImage1 *string `json:"pet_image1"`
+	}
+	if err := middleware.DBConn.Table("petinfo").
+		Select("petinfo.*, petmedia.pet_image1").
+		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
+		Where("petinfo.shelter_id = ?", shelterID).
+		Scan(&pets).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Database error while fetching pets",
+			"error":   err.Error(),
+		})
+	}
+
+	// Combine shelter info and pets into a single response
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Shelter and pets retrieved successfully",
+		"data": fiber.Map{
+			"shelter": shelterInfo,
+			"pets":    pets,
 		},
 	})
 }
