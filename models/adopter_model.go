@@ -40,3 +40,15 @@ type AdopterMedia struct {
 	AdopterID      uint   `gorm:"primaryKey;autoIncrement:false" json:"adopter_id"`
 	AdopterProfile string `json:"adopter_profile"`
 }
+
+func (AdoptedPet) TableName() string {
+	return "adopterpets"
+}
+
+type AdoptedPet struct {
+	AdoptedID uint `gorm:"column:adopted_id;primaryKey;autoIncrement" json:"adopted_id"`
+
+	AdopterID uint `gorm:"column:adopter_id" json:"adopter_id"`
+
+	PetID uint `gorm:"column:pet_id" json:"pet_id"`
+}
