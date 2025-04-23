@@ -681,52 +681,6 @@ func ShelterChangePassword(c *fiber.Ctx) error {
 	})
 }
 
-// func GetAllShelters(c *fiber.Ctx) error {
-// 	// Fetch all shelter accounts
-// 	var shelterAccounts []models.ShelterAccount
-// 	accountResult := middleware.DBConn.Find(&shelterAccounts)
-
-// 	if accountResult.Error != nil {
-// 		return c.JSON(response.ShelterResponseModel{
-// 			RetCode: "400",
-// 			Message: "Failed to fetch shelter accounts",
-// 			Data:    nil,
-// 		})
-// 	}
-
-// 	// Fetch all shelter info
-// 	var shelterInfos []models.ShelterInfo
-// 	infoResult := middleware.DBConn.Find(&shelterInfos)
-
-// 	if infoResult.Error != nil {
-// 		return c.JSON(response.ShelterResponseModel{
-// 			RetCode: "400",
-// 			Message: "Failed to fetch shelter info",
-// 			Data:    nil,
-// 		})
-// 	}
-
-// 	// Combine accounts and info into a single response
-// 	shelters := []fiber.Map{}
-// 	for _, account := range shelterAccounts {
-// 		for _, info := range shelterInfos {
-// 			if account.ShelterID == info.ShelterID {
-// 				shelters = append(shelters, fiber.Map{
-// 					"shelter": account,
-// 					"info":    info,
-// 				})
-// 				break
-// 			}
-// 		}
-// 	}
-
-// 	return c.JSON(response.ShelterResponseModel{
-// 		RetCode: "200",
-// 		Message: "All shelters retrieved successfully",
-// 		Data:    shelters,
-// 	})
-// }
-
 func GetShelterByName(c *fiber.Ctx) error {
 	shelterName := c.Query("shelter_name")
 	if shelterName == "" {
@@ -802,3 +756,10 @@ func CountPetsByShelter(c *fiber.Ctx) error {
 		},
 	})
 }
+
+// func GetAdoptionApplication(c *fiber.Ctx) error {
+// 	adopterID := c.Params("adopter_id")
+// 	status := c.Query("status")
+	
+
+// }
