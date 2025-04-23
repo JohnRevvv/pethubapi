@@ -1,8 +1,10 @@
 package controllers
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
+	"io"
 	"strconv"
 	"time"
 
@@ -13,6 +15,48 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
+
+
+// func GetAllAdopters(c *fiber.Ctx) error {
+// 	// Fetch all adopter accounts
+// 	var adopterAccounts []models.AdopterAccount
+// 	accountResult := middleware.DBConn.Find(&adopterAccounts)
+
+// 	if accountResult.Error != nil {
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"message": "Failed to fetch adopter accounts",
+// 		})
+// 	}
+
+// 	// Fetch all adopter info
+// 	var adopterInfos []models.AdopterInfo
+// 	infoResult := middleware.DBConn.Find(&adopterInfos)
+
+// 	if infoResult.Error != nil {
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"message": "Failed to fetch adopter info",
+// 		})
+// 	}
+
+// 	// Combine accounts and info into a single response
+// 	adopters := []fiber.Map{}
+// 	for _, account := range adopterAccounts {
+// 		for _, info := range adopterInfos {
+// 			if account.AdopterID == info.AdopterID {
+// 				adopters = append(adopters, fiber.Map{
+// 					"adopter": account,
+// 					"info":    info,
+// 				})
+// 				break
+// 			}
+// 		}
+// 	}
+
+// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+// 		"message": "Adopters retrieved successfully",
+// 		"data":    adopters,
+// 	})
+// }
 
 // CreateAdopter creates an adopter account and info
 func RegisterAdopter(c *fiber.Ctx) error {
@@ -104,12 +148,6 @@ func RegisterAdopter(c *fiber.Ctx) error {
 	})
 }
 
-// ==============================================================
-
-// LoginAdopter authenticates an adopter and retrieves their info
-
-// ==============================================================
-
 func LoginAdopter(c *fiber.Ctx) error {
 	// Parse request body
 	requestBody := struct {
@@ -163,47 +201,6 @@ func LoginAdopter(c *fiber.Ctx) error {
 		},
 	})
 }
-
-// func GetAllAdopters(c *fiber.Ctx) error {
-// 	// Fetch all adopter accounts
-// 	var adopterAccounts []models.AdopterAccount
-// 	accountResult := middleware.DBConn.Find(&adopterAccounts)
-
-// 	if accountResult.Error != nil {
-// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-// 			"message": "Failed to fetch adopter accounts",
-// 		})
-// 	}
-
-// 	// Fetch all adopter info
-// 	var adopterInfos []models.AdopterInfo
-// 	infoResult := middleware.DBConn.Find(&adopterInfos)
-
-// 	if infoResult.Error != nil {
-// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-// 			"message": "Failed to fetch adopter info",
-// 		})
-// 	}
-
-// 	// Combine accounts and info into a single response
-// 	adopters := []fiber.Map{}
-// 	for _, account := range adopterAccounts {
-// 		for _, info := range adopterInfos {
-// 			if account.AdopterID == info.AdopterID {
-// 				adopters = append(adopters, fiber.Map{
-// 					"adopter": account,
-// 					"info":    info,
-// 				})
-// 				break
-// 			}
-// 		}
-// 	}
-
-// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-// 		"message": "Adopters retrieved successfully",
-// 		"data":    adopters,
-// 	})
-// }
 
 func GetAdopterInfoByID(c *fiber.Ctx) error {
 	adopterID := c.Params("id")
@@ -479,3 +476,162 @@ func GetShelterWithPetsByID(c *fiber.Ctx) error {
 		},
 	})
 }
+
+func AdoptionApplication(c *fiber.Ctx) error {
+	adopterID := c.Params("adopter_id")
+	petID := c.Params("pet_id")
+
+	// Check if adopterID or petID is invalid (non-numeric)
+	adopterUint, err := strconv.ParseUint(adopterID, 10, 32)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid Adopter ID",
+		})
+	}
+
+	petUint, err := strconv.ParseUint(petID, 10, 32)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid Pet ID",
+		})
+	}
+
+	// Helper to convert file to base64
+	convertFileToBase64 := func(fieldName string) (string, error) {
+		fileHeader, err := c.FormFile(fieldName)
+		if err != nil {
+			return "", nil // File is optional
+		}
+		file, err := fileHeader.Open()
+		if err != nil {
+			return "", err
+		}
+		defer file.Close()
+
+		buf := new(bytes.Buffer)
+		if _, err := io.Copy(buf, file); err != nil {
+			return "", err
+		}
+		return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
+	}
+
+	// Convert files to base64
+	houseFileBase64, _ := convertFileToBase64("housefile")
+	altValidIDBase64, _ := convertFileToBase64("alt_valid_id")
+	homePhotosBase64, _ := convertFileToBase64("home_photos")
+	validIDBase64, _ := convertFileToBase64("valid_id")
+
+	// Parse form values
+	requestBody := struct {
+		AltFName                 string
+		AltLName                 string
+		Relationship             string
+		AltContactNumber         string
+		AltEmail                 string
+		PetType                  string
+		SpecificShelterAnimal    string
+		IdealPetDescription      string
+		BuildingType             string
+		Rent                     string
+		PetMovePlan              string
+		HouseholdComposition     string
+		AllergiesToAnimals       string
+		CareResponsibility       string
+		FinancialResponsibility  string
+		VacationCarePlan         string
+		AloneTime                string
+		IntroductionPlan         string
+		FamilySupport            string
+		FamilySupportExplanation string
+		OtherPets                string
+		PastPets                 string
+		IDType                   string
+		PreferredInterviewSetting string
+	}{
+		AltFName:                 c.FormValue("alt_f_name"),
+		AltLName:                 c.FormValue("alt_l_name"),
+		Relationship:             c.FormValue("relationship"),
+		AltContactNumber:         c.FormValue("alt_contact_number"),
+		AltEmail:                 c.FormValue("alt_email"),
+		PetType:                  c.FormValue("pet_type"),
+		SpecificShelterAnimal:    c.FormValue("specific_shelter_animal"),
+		IdealPetDescription:      c.FormValue("ideal_pet_description"),
+		BuildingType:             c.FormValue("building_type"),
+		Rent:                     c.FormValue("rent"),
+		PetMovePlan:              c.FormValue("pet_move_plan"),
+		HouseholdComposition:     c.FormValue("household_composition"),
+		AllergiesToAnimals:       c.FormValue("allergies_to_animals"),
+		CareResponsibility:       c.FormValue("care_responsibility"),
+		FinancialResponsibility:  c.FormValue("financial_responsibility"),
+		VacationCarePlan:         c.FormValue("vacation_care_plan"),
+		AloneTime:                c.FormValue("alone_time"),
+		IntroductionPlan:         c.FormValue("introduction_plan"),
+		FamilySupport:            c.FormValue("family_support"),
+		FamilySupportExplanation: c.FormValue("family_support_explanation"),
+		OtherPets:                c.FormValue("other_pets"),
+		PastPets:                 c.FormValue("past_pets"),
+		IDType:                   c.FormValue("id_type"),
+		PreferredInterviewSetting: c.FormValue("preferred_interview_setting"),
+	}
+
+	// Create adoption application
+	adoptionApplication := models.AdoptionApplication{
+		PetID:            uint(petUint),
+		AdopterID:        uint(adopterUint),
+		AltFName:         requestBody.AltFName,
+		AltLName:         requestBody.AltLName,
+		Relationship:     requestBody.Relationship,
+		AltContactNumber: requestBody.AltContactNumber,
+		AltEmail:         requestBody.AltEmail,
+		HouseFile:        houseFileBase64,
+		ValidID:          altValidIDBase64,
+	}
+
+	tx := middleware.DBConn.Begin()
+	if err := tx.Create(&adoptionApplication).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to create adoption application",
+		})
+	}
+
+	// Save questionnaire
+	questionnaire := models.Questionnaires{
+		ApplicationID:             adoptionApplication.ApplicationID,
+		PetType:                   requestBody.PetType,
+		SpecificShelterAnimal:     requestBody.SpecificShelterAnimal,
+		IdealPetDescription:       requestBody.IdealPetDescription,
+		BuildingType:              requestBody.BuildingType,
+		Rent:                      requestBody.Rent,
+		PetMovePlan:               requestBody.PetMovePlan,
+		HouseholdComposition:      requestBody.HouseholdComposition,
+		AllergiesToAnimals:        requestBody.AllergiesToAnimals,
+		CareResponsibility:        requestBody.CareResponsibility,
+		FinancialResponsibility:   requestBody.FinancialResponsibility,
+		VacationCarePlan:          requestBody.VacationCarePlan,
+		AloneTime:                 requestBody.AloneTime,
+		IntroductionPlan:          requestBody.IntroductionPlan,
+		FamilySupport:             requestBody.FamilySupport,
+		FamilySupportExplanation:  requestBody.FamilySupportExplanation,
+		OtherPets:                 requestBody.OtherPets,
+		PastPets:                  requestBody.PastPets,
+		HomePhotos:                homePhotosBase64,
+		ValidID:                   validIDBase64,
+		IDType:                    requestBody.IDType,
+		PreferredInterviewSetting: requestBody.PreferredInterviewSetting,
+	}
+
+	if err := tx.Create(&questionnaire).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to save questionnaire",
+		})
+	}
+
+	tx.Commit()
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Adoption application submitted successfully",
+	})
+}
+

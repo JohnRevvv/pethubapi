@@ -23,6 +23,8 @@ type PetResponse struct {
 	PetAge          int      `json:"pet_age"`
 	AgeType         string   `json:"age_type"`
 	PetSex          string   `json:"pet_sex"`
+	PetSize         string   `json:"pet_size"`
+	PriorityStatus  bool     `json:"priority_status"`
 	PetDescriptions string   `json:"pet_descriptions"`
 	ShelterID       uint     `json:"shelter_id"`
 	PetImages       []string `json:"pet_image1"`
@@ -47,7 +49,9 @@ func AddPetInfo(c *fiber.Ctx) error {
 		PetAge          int    `json:"pet_age"`
 		AgeType         string `json:"age_type"`
 		PetSex          string `json:"pet_sex"`
+		PetSize         string `json:"pet_size"`
 		PetDescriptions string `json:"pet_descriptions"`
+		PriorityStatus  bool   `json:"priority_status"`
 		PetImage1       string `json:"pet_image1"`
 	}{
 		PetType:         c.FormValue("pet_type"),
@@ -55,7 +59,9 @@ func AddPetInfo(c *fiber.Ctx) error {
 		PetAge:          petAge,
 		AgeType:         c.FormValue("age_type"),
 		PetSex:          c.FormValue("pet_sex"),
+		PetSize:         c.FormValue("pet_size"),
 		PetDescriptions: c.FormValue("pet_descriptions"),
+		PriorityStatus:  c.FormValue("priority_status") == "1",
 		PetImage1:       c.FormValue("pet_image1"),
 	}
 
@@ -67,6 +73,8 @@ func AddPetInfo(c *fiber.Ctx) error {
 		PetAge:          requestBody.PetAge,
 		AgeType:         requestBody.AgeType,
 		PetSex:          requestBody.PetSex,
+		PetSize:         requestBody.PetSize,
+		PriorityStatus:  requestBody.PriorityStatus,
 		PetDescriptions: requestBody.PetDescriptions,
 		CreatedAt:       time.Now(),
 	}
@@ -122,6 +130,7 @@ func FetchAndSearchPets(c *fiber.Ctx) error {
 	petName := c.Query("pet_name")
 	petSex := c.Query("sex")
 	petType := c.Query("type")
+	prioritystatus := c.Query("priority_status")
 
 	var pets []models.PetInfo
 
@@ -139,9 +148,11 @@ func FetchAndSearchPets(c *fiber.Ctx) error {
 	if petType != "" {
 		query = query.Where("pet_type = ?", petType)
 	}
+	if prioritystatus != "" {
+		query = query.Where("priority_status = ?", prioritystatus)
+	}
 
-
-	result := query.Order("created_at DESC").Find(&pets)
+	result := query.Order("priority_status DESC").Order("created_at DESC").Find(&pets)
 	if result.Error != nil {
 		return c.JSON(response.ShelterResponseModel{
 			RetCode: "500",
@@ -185,6 +196,7 @@ func FetchAndSearchPets(c *fiber.Ctx) error {
 			PetType:   pet.PetType,
 			PetName:   pet.PetName,
 			PetSex:    pet.PetSex,
+			PriorityStatus: pet.PriorityStatus,
 			ShelterID: pet.ShelterID,
 			PetImages: petMediaMap[pet.PetID],
 		})
@@ -221,7 +233,6 @@ func FetchAndSearchArchivedPets(c *fiber.Ctx) error {
 	if petType != "" {
 		query = query.Where("pet_type = ?", petType)
 	}
-
 
 	result := query.Order("created_at DESC").Find(&pets)
 	if result.Error != nil {
@@ -417,7 +428,9 @@ func GetPetInfoByPetID(c *fiber.Ctx) error {
 		PetAge:          petInfo.PetAge,
 		AgeType:         petInfo.AgeType,
 		PetSex:          petInfo.PetSex,
+		PetSize:         petInfo.PetSize,
 		PetDescriptions: petInfo.PetDescriptions,
+		PriorityStatus:  petInfo.PriorityStatus,
 		ShelterID:       petInfo.ShelterID,
 		PetImages:       petImages, // Attach pet images
 	}
@@ -455,6 +468,7 @@ func UpdatePetInfo(c *fiber.Ctx) error {
 	petInfo.PetName = c.FormValue("pet_name")
 	petInfo.PetType = c.FormValue("pet_type")
 	petInfo.PetSex = c.FormValue("pet_sex")
+	petInfo.PetSize = c.FormValue("pet_size")
 	petInfo.PetDescriptions = c.FormValue("pet_descriptions")
 	petInfo.AgeType = c.FormValue("age_type")
 
@@ -526,6 +540,39 @@ func UpdatePetInfo(c *fiber.Ctx) error {
 	return c.JSON(response.ShelterResponseModel{
 		RetCode: "200",
 		Message: "Pet info and media updated successfully",
+		Data:    petInfo,
+	})
+}
+
+func UpdatePriorityStatus(c *fiber.Ctx) error {
+	petID := c.Params("id")
+
+	// Fetch the existing PetInfo record
+	var petInfo models.PetInfo
+	infoResult := middleware.DBConn.Where("pet_id = ?", petID).First(&petInfo)
+	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "404",
+			Message: "Pet info not found",
+			Data:    nil,
+		})
+
+	} else if infoResult.Error != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error while fetching pet info",
+			Data:    infoResult.Error,
+		})
+	}
+
+	// Update the priority status
+	petInfo.PriorityStatus = !petInfo.PriorityStatus // Toggle the priority status
+
+	middleware.DBConn.Table("petinfo").Where("pet_id = ?", petID).Updates(&petInfo)
+
+	return c.JSON(response.ShelterResponseModel{
+		RetCode: "200",
+		Message: "Pet priority status updated successfully",
 		Data:    petInfo,
 	})
 }
