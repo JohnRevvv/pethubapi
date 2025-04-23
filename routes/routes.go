@@ -2,6 +2,7 @@ package routes
 
 import (
 	"pethub_api/controllers"
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -15,6 +16,10 @@ func AppRoutes(app *fiber.App) {
 	app.Post("/admin/updateregstatus", controllers.UpdateRegistrationStatus)
 	app.Post("/admin/updateshelterstatus", controllers.UpdateShelterStatus)
 	app.Post("/admin/updateadopterstatus", controllers.UpdateAdopterStatus)
+
+	//try
+	app.Get("/admin/getallshelterstry", controllers.GetAllSheltersAdmintry) // Route to get all shelters by id
+	app.Put("/admin/shelters/:id/approve", controllers.ApproveShelterRegStatus)
 
 	// ---------------- Adopter Routes ----------------
 	app.Post("/user/register", controllers.RegisterAdopter)
@@ -65,7 +70,6 @@ func AppRoutes(app *fiber.App) {
 	app.Post("/adopter/forgot-password", controllers.AdopterForgotPassword)
 	app.Post("/adopter/verify-code", controllers.AdopterVerifyResetCode)
 	app.Post("/adopter/reset-password", controllers.AdopterResetPassword)
-
 
 	// ---------------- Adoption Application ----------------
 	app.Post("/adoption/application/:adopter_id/:pet_id", controllers.AdoptionApplication)
