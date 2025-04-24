@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"mime/multipart"
 	"strconv"
+	"strings"
 	"time"
 
 	"pethub_api/middleware"
@@ -43,6 +44,48 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 	familySupport := c.FormValue("familySupport")
 	pastPets := c.FormValue("pastPets")
 	interviewSetting := c.FormValue("interviewSetting")
+
+	// Basic input validation
+	if altFName == "" || altLName == "" || relationship == "" || altContactNumber == "" || altEmail == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Alternate contact fields are required.",
+		})
+	}
+
+	if petType == "" || idealPetDescription == "" || housingSituation == "" || petsAtHome == "" || allergies == "" || familySupport == "" || pastPets == "" || interviewSetting == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Please complete all required questionnaire fields.",
+		})
+	}
+
+	// Contact number validation
+	if len(altContactNumber) < 11 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Contact numbers must be at least 11 digits.",
+		})
+	}
+	for _, ch := range altContactNumber {
+		if ch < '0' || ch > '9' {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Contact number must only contain digits.",
+			})
+		}
+	}
+
+	// Email format validation (basic)
+	if !strings.Contains(altEmail, "@") || !strings.Contains(altEmail, ".") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid alternate email format.",
+		})
+	}
+
+	// Duplicate altEmail check (globally unique)
+	var existingSubmission models.AdoptionSubmission
+	if err := middleware.DBConn.Where("alt_email = ?", altEmail).First(&existingSubmission).Error; err == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Alternate email is already used in a previous submission. Please use a different one.",
+		})
+	}
 
 	tx := middleware.DBConn.Begin()
 	if tx == nil {
@@ -176,3 +219,4 @@ func encodeFileToBase64(fileHeader *multipart.FileHeader) (string, error) {
 
 	return base64.StdEncoding.EncodeToString(fileData), nil
 }
+
