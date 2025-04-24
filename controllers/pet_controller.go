@@ -545,36 +545,42 @@ func UpdatePetInfo(c *fiber.Ctx) error {
 }
 
 func UpdatePriorityStatus(c *fiber.Ctx) error {
-	petID := c.Params("id")
+    petID := c.Params("id")
 
-	// Fetch the existing PetInfo record
-	var petInfo models.PetInfo
-	infoResult := middleware.DBConn.Where("pet_id = ?", petID).First(&petInfo)
-	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
-		return c.JSON(response.ShelterResponseModel{
-			RetCode: "404",
-			Message: "Pet info not found",
-			Data:    nil,
-		})
+    // Fetch the existing PetInfo record
+    var petInfo models.PetInfo
+    infoResult := middleware.DBConn.Where("pet_id = ?", petID).First(&petInfo)
+    if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+        return c.JSON(response.ShelterResponseModel{
+            RetCode: "404",
+            Message: "Pet info not found",
+            Data:    nil,
+        })
+    } else if infoResult.Error != nil {
+        return c.JSON(response.ShelterResponseModel{
+            RetCode: "500",
+            Message: "Database error while fetching pet info",
+            Data:    infoResult.Error,
+        })
+    }
 
-	} else if infoResult.Error != nil {
-		return c.JSON(response.ShelterResponseModel{
-			RetCode: "500",
-			Message: "Database error while fetching pet info",
-			Data:    infoResult.Error,
-		})
-	}
+    // Toggle the priority status
+    petInfo.PriorityStatus = !petInfo.PriorityStatus // Toggle the boolean value
 
-	// Update the priority status
-	petInfo.PriorityStatus = !petInfo.PriorityStatus // Toggle the priority status
+    // Update only the priority_status field in the database
+    if err := middleware.DBConn.Model(&petInfo).Update("priority_status", petInfo.PriorityStatus).Error; err != nil {
+        return c.JSON(response.ShelterResponseModel{
+            RetCode: "500",
+            Message: "Error updating priority status",
+            Data:    err.Error(),
+        })
+    }
 
-	middleware.DBConn.Table("petinfo").Where("pet_id = ?", petID).Updates(&petInfo)
-
-	return c.JSON(response.ShelterResponseModel{
-		RetCode: "200",
-		Message: "Pet priority status updated successfully",
-		Data:    petInfo,
-	})
+    return c.JSON(response.ShelterResponseModel{
+        RetCode: "200",
+        Message: "Pet priority status updated successfully",
+        Data:    petInfo,
+    })
 }
 
 func SetPetStatusToArchive(c *fiber.Ctx) error {

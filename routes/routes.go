@@ -56,7 +56,7 @@ func AppRoutes(app *fiber.App) {
 	app.Get("/shelter/:id/get/donationinfo", controllers.GetShelterDonationInfo)
 	app.Put("/shelter/:id/update/donationinfo", controllers.UpdateShelterDonations)
 	app.Put("/shelter/:id/change-password", controllers.ShelterChangePassword)
-	app.Put("/shelter/:pet_id/pet/update-priority-status", controllers.UpdatePriorityStatus)
+	app.Put("/shelter/:id/pet/update-priority-status", controllers.UpdatePriorityStatus)
 
 	// ---------------- General Shared Routes ----------------
 	app.Get("/allshelter", controllers.GetShelter)
