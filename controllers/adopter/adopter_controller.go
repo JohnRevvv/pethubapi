@@ -3,11 +3,11 @@ package controllers
 import (
 	"encoding/base64"
 	"errors"
-	"strconv"
-	"time"
-
+	"fmt"
 	"pethub_api/middleware"
 	"pethub_api/models"
+	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
@@ -126,7 +126,6 @@ func LoginAdopter(c *fiber.Ctx) error {
 	// Check if the adopter exists
 	var adopterAccount models.AdopterAccount
 	result := middleware.DBConn.Where("username = ?", requestBody.Username).First(&adopterAccount)
-
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Invalid username or password",
@@ -144,19 +143,27 @@ func LoginAdopter(c *fiber.Ctx) error {
 		})
 	}
 
+	// ✅ Generate JWT token
+	token, err := middleware.GenerateToken(adopterAccount.AdopterID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to generate token",
+		})
+	}
+
 	// Fetch adopter info
 	var adopterInfo models.AdopterInfo
 	infoResult := middleware.DBConn.Where("adopter_id = ?", adopterAccount.AdopterID).First(&adopterInfo)
-
 	if infoResult.Error != nil && !errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Failed to fetch adopter info",
 		})
 	}
 
-	// Login successful, return adopter account and info
+	// Login successful, return token and adopter info
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Login successful",
+		"token":   token, // ✅ Return token here
 		"data": fiber.Map{
 			"adopter": adopterAccount,
 			"info":    adopterInfo,
@@ -206,11 +213,30 @@ func GetAllAdopters(c *fiber.Ctx) error {
 }
 
 func GetAdopterInfoByID(c *fiber.Ctx) error {
-	adopterID := c.Params("id")
+	adopterIDParam := c.Params("id")
 
-	// Fetch shelter info by ID
+	// Handle "me" as a special case, replacing it with the authenticated adopter's ID
+	if adopterIDParam == "me" {
+		adopterIDFromSession := c.Locals("adopter_id")
+		if adopterIDFromSession == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "Unauthorized",
+			})
+		}
+		adopterIDParam = fmt.Sprintf("%v", adopterIDFromSession)
+	}
+
+	// Ensure the ID is a valid integer
+	id, err := strconv.Atoi(adopterIDParam)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid adopter ID format",
+		})
+	}
+
+	// Fetch adopter info by ID
 	var adopterInfo models.AdopterInfo
-	infoResult := middleware.DBConn.Where("adopter_id = ?", adopterID).First(&adopterInfo)
+	infoResult := middleware.DBConn.Where("adopter_id = ?", id).First(&adopterInfo)
 
 	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -224,7 +250,7 @@ func GetAdopterInfoByID(c *fiber.Ctx) error {
 
 	// Fetch adopter media by ID
 	var adopterMedia models.AdopterMedia
-	mediaResult := middleware.DBConn.Where("adopter_id = ?", adopterID).First(&adopterMedia)
+	mediaResult := middleware.DBConn.Where("adopter_id = ?", id).First(&adopterMedia)
 
 	// If no adopter media is found, set it to null
 	var mediaResponse interface{}

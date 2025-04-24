@@ -27,7 +27,7 @@ type Questionnaires struct {
 	PastPets                  string `json:"past_pets" gorm:"default:'no'"`  // Change to string ("yes"/"no")
 	HomePhotos                string // store paths as comma-separated string
 	ValidID                   string
-	IDProof                   string    `json:"id_proof,omitempty"`
+	IDType                    string    `json:"id_type,omitempty"`
 	PreferredInterviewSetting string    `json:"preferred_interview_setting"` // NEW FIELD
 	CreatedAt                 time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt                 time.Time `json:"updated_at" gorm:"autoUpdateTime"`

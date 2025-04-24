@@ -3,19 +3,23 @@ package routes
 import (
 	"pethub_api/controllers"
 	adopter "pethub_api/controllers/adopter"
+	adoptionform "pethub_api/controllers/adoptionform"
 	shelter "pethub_api/controllers/shelter"
+	"pethub_api/middleware"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 func AppRoutes(app *fiber.App) {
 
-	// Admin Routes
-	app.Post("/admin/register", controllers.RegisterAdmin)
-	app.Post("/admin/login", controllers.AdminLogin)
-	app.Get("/admin/view-all-accounts", controllers.ViewAllAccounts)
-	app.Put("/admin/update-status/:type/:id", controllers.UpdateAccountStatus)
-	app.Delete("/admin/delete-account/:type/:id", controllers.DeleteAccount)
+	// Middleware for JWT validation
+
+	// protcted routes?
+	//jwt := app.Group("/api", middleware.ValidateJWTMiddleware)
+
+	//app.Post("/adoption-application/:pet_id", middleware.ValidateJWTMiddleware, adoptionform.SubmitAdoptionApplication)
+
+	//jwt.Post("/questionnaires", adoptionform.CreateQuestionnaire)
 
 	// Adopter Routes
 	app.Post("/user/register", adopter.RegisterAdopter)
@@ -41,31 +45,28 @@ func AppRoutes(app *fiber.App) {
 
 	// search
 	app.Get("/filter/:id/pets/search", shelter.FetchAndSearchPets) // Route to search pets by name
-	//app.Get("/search/pets/name/:pet_name", shelter.SearchPetsByName) // Route to search pets
-	//app.Get("/filter/pets/sex/:id/:pet_sex", shelter.FilterPetsBySex)
-	//app.Get("/filter/pets/type/:id/:pet_type", shelter.FilterPetsByPetType)
 
 	// Pet Routes
 	app.Post("/shelter/:id/add-pet-info", shelter.AddPetInfo)
 	// app.Post("/shelter/:id/add-pet-media", shelter.AddPetMedia)
 
 	// Questionnaire Routes
-	app.Post("/questionnaires", controllers.CreateQuestionnaire) // Route to submit a questionnaire
+	//app.Post("/questionnaires", adoptionform.CreateQuestionnaire) // Route to submit a questionnaire
 
 	// Adoptionform Routes
-	app.Post("/adoption-application/:pet_id", controllers.SubmitAdoptionApplication)
+	//app.Post("/adoption-application/:pet_id", adoptionform.SubmitAdoptionApplication)
 
 	// Route for getting specific adoption application by adopter_id
-	app.Get("/adoption-application/:adopter_id", controllers.GetAdoptionApplication)
+	//app.Get("/adoption-application/:adopter_id", adoptionform.GetAdoptionApplication)
 
 	// Route for getting a specific questionanire form by adopter_id
-	app.Get("/questionnaire/:application_id", controllers.GetQuestionnaire)
+	//app.Get("/questionnaire/:application_id", adoptionform.GetQuestionnaire)
 
 	// Route for getting both adoption application and questionnaire form by adopter_id
-	app.Get("/adoption-and-questionnaire/:adopter_id", controllers.GetAdoptionApplicationAndQuestionnaire)
+	//app.Get("/adoption-and-questionnaire/:adopter_id", adoptionform.GetAdoptionApplicationAndQuestionnaire)
 
 	// Define the route for updating adoption and questionnaire
-	app.Put("/updateAdoptionAndQuestionnaire", controllers.UpdateAdoptionAndQuestionnaire)
+	//app.Put("/updateAdoptionAndQuestionnaire", adoptionform.UpdateAdoptionAndQuestionnaire)
 
 	app.Post("/shelter/:id/add-pet-info", shelter.AddPetInfo)
 	app.Get("/allshelter", adopter.GetShelter)
@@ -78,4 +79,6 @@ func AppRoutes(app *fiber.App) {
 	app.Put("/adopter/:id", adopter.EditAdopterProfile)
 
 	// pakyu
+	app.Post("/submission/:pet_id", middleware.ValidateJWTMiddleware, adoptionform.CreateAdoptionSubmission)
+
 }
