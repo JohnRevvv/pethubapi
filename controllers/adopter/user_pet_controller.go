@@ -21,6 +21,8 @@ type PetInfo struct {
 	Status         string    `json:"status"`
 	CreatedAt      time.Time `json:"created_at"`
 	PetType        *string   `json:"pet_type"` // Nullable column
+	PetSize        string    `json:"pet_size"`
+	PriorityStatus bool      `json:"priority_status"`
 }
 
 // GetAllPets retrieves all pet records from the petinfo table
@@ -30,84 +32,64 @@ type PetMedia struct {
 }
 
 func GetAllPets(c *fiber.Ctx) error {
-	// Get all pets first
-	var pets []PetInfo
-	if err := middleware.DBConn.Table("petinfo").Find(&pets).Error; err != nil {
+	// Define a struct to include pet info and the pet_image1 field
+	type PetWithImage struct {
+		PetInfo
+		PetImage1 string `json:"pet_image1"`
+	}
+
+	// Create a slice to store all pets with images
+	var pets []PetWithImage
+
+	// Fetch all pets and their images from the database
+	result := middleware.DBConn.Table("petinfo").
+		Select("petinfo.*, petmedia.pet_image1").
+		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
+		Find(&pets)
+
+	// Handle errors
+	if result.Error != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Error retrieving pets",
 		})
 	}
 
-	// Get all pet media
-	var petMedia []PetMedia
-	if err := middleware.DBConn.Table("petmedia").Find(&petMedia).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Error retrieving pet media",
-		})
-	}
-
-	// Create a map for quick lookup
-	mediaMap := make(map[uint]*string)
-	for _, media := range petMedia {
-		mediaMap[media.PetID] = media.PetImage1
-	}
-
-	// Combine the data
-	type Response struct {
-		PetInfo
-		PetImage1 *string `json:"pet_image1"`
-	}
-
-	var response []Response
-	for _, pet := range pets {
-		response = append(response, Response{
-			PetInfo:   pet,
-			PetImage1: mediaMap[pet.PetID],
-		})
-	}
-
-	return c.JSON(response)
+	// Return the list of pets
+	return c.JSON(pets)
 }
 
 func GetPetByID(c *fiber.Ctx) error {
 	petID := c.Params("id")
 
-	var result struct {
-		models.PetInfo
-		PetImage1 string `json:"pet_image1"`
-	}
+	// Fetch shelter info by ID
+	var petInfo models.PetInfo
+	infoResult := middleware.DBConn.Table("petinfo").Where("pet_id = ?", petID).First(&petInfo)
 
-	if err := middleware.DBConn.Table("petinfo").
-		Select("petinfo.*, petmedia.pet_image1").
-		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
-		Where("petinfo.pet_id = ?", petID).
-		First(&result).Error; err != nil {
-
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"message": "pet info not found",
-			})
-		}
+	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "pet info not found",
+		})
+	} else if infoResult.Error != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Database error",
 		})
 	}
 
+	// Fetch shelter account associated with the shelter info
+	var petData models.PetInfo
+	accountResult := middleware.DBConn.Where("pet_id = ?", petID).First(&petData)
+
+	if accountResult.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to fetch pet account",
+		})
+	}
+
+	// Return the pet info with its image
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Pet info retrieved successfully",
+		"message": "Shelter info retrieved successfully",
 		"data": fiber.Map{
-			"info": fiber.Map{
-				"pet_id":           result.PetID,
-				"shelter_id":       result.ShelterID,
-				"pet_name":         result.PetName,
-				"pet_age":          result.PetAge,
-				"pet_sex":          result.PetSex,
-				"pet_descriptions": result.PetDescriptions,
-				"status":           result.Status,
-				"created_at":       result.CreatedAt,
-				"pet_type":         result.PetType,
-				"pet_image1":       result.PetImage1,
-			},
+			"info": petInfo,
 		},
 	})
 }

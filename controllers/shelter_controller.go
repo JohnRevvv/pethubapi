@@ -116,6 +116,7 @@ func LoginShelter(c *fiber.Ctx) error {
 	requestBody := struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
+		RegStatus string `json:"reg_status"`
 	}{}
 
 	if err := c.BodyParser(&requestBody); err != nil {
@@ -140,6 +141,15 @@ func LoginShelter(c *fiber.Ctx) error {
 		return c.JSON(response.ShelterResponseModel{
 			RetCode: "500", // Internal server error
 			Message: "Database error",
+			Data:    nil,
+		})
+	}
+
+	// Check if account is pending
+	if ShelterAccount.RegStatus == "pending" {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "403", // Forbidden
+			Message: "Your account is pending, please wait for admin approval",
 			Data:    nil,
 		})
 	}
@@ -482,49 +492,192 @@ func GetShelterDetailsByID(c *fiber.Ctx) error {
 	})
 }
 
-func GetAllShelters(c *fiber.Ctx) error {
-	// Fetch all shelter accounts
-	var shelterAccounts []models.ShelterAccount
-	accountResult := middleware.DBConn.Find(&shelterAccounts)
+func GetShelterDonationInfo(c *fiber.Ctx) error {
+	shelterID := c.Params("id")
 
-	if accountResult.Error != nil {
+	var shelterDonations models.ShelterDonations
+	infoResult := middleware.DBConn.Where("shelter_id = ?", shelterID).First(&shelterDonations)
+
+	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
 		return c.JSON(response.ShelterResponseModel{
-			RetCode: "400",
-			Message: "Failed to fetch shelter accounts",
+			RetCode: "404",
+			Message: "Shelter not found",
 			Data:    nil,
+		})
+	} else if infoResult.Error != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error while fetching shelter donation info",
+			Data:    infoResult.Error,
 		})
 	}
 
-	// Fetch all shelter info
-	var shelterInfos []models.ShelterInfo
-	infoResult := middleware.DBConn.Find(&shelterInfos)
+	return c.JSON(response.ShelterResponseModel{
+		RetCode: "200",
+		Message: "Shelter donation info retrieved successfully",
+		Data:    shelterDonations,
+	})
+}
 
-	if infoResult.Error != nil {
+func UpdateShelterDonations(c *fiber.Ctx) error {
+	shelterID := c.Params("id")
+
+	// Parse shelter ID
+	parsedShelterID, err := strconv.ParseUint(shelterID, 10, 32)
+	if err != nil {
 		return c.JSON(response.ShelterResponseModel{
 			RetCode: "400",
-			Message: "Failed to fetch shelter info",
-			Data:    nil,
+			Message: "Invalid shelter ID",
+			Data:    err,
 		})
 	}
 
-	// Combine accounts and info into a single response
-	shelters := []fiber.Map{}
-	for _, account := range shelterAccounts {
-		for _, info := range shelterInfos {
-			if account.ShelterID == info.ShelterID {
-				shelters = append(shelters, fiber.Map{
-					"shelter": account,
-					"info":    info,
-				})
-				break
-			}
+	// Check if donation record exists
+	var shelterDonations models.ShelterDonations
+	result := middleware.DBConn.Where("shelter_id = ?", parsedShelterID).First(&shelterDonations)
+
+	isNew := errors.Is(result.Error, gorm.ErrRecordNotFound)
+	if isNew {
+		shelterDonations = models.ShelterDonations{ShelterID: uint(parsedShelterID)}
+	}
+
+	// Parse text fields from form-data
+	shelterDonations.AccountNumber = c.FormValue("account_number", shelterDonations.AccountNumber)
+	shelterDonations.AccountName = c.FormValue("account_name", shelterDonations.AccountName)
+
+	// Handle QR image file upload
+	qrFile, err := c.FormFile("qr_image")
+	if err == nil {
+		fileContent, err := qrFile.Open()
+		if err != nil {
+			return c.JSON(response.ShelterResponseModel{
+				RetCode: "400",
+				Message: "Failed to open QR image",
+				Data:    err,
+			})
+		}
+		defer fileContent.Close()
+
+		fileBytes, err := ioutil.ReadAll(fileContent)
+		if err != nil {
+			return c.JSON(response.ShelterResponseModel{
+				RetCode: "400",
+				Message: "Failed to read QR image",
+				Data:    err,
+			})
+		}
+		shelterDonations.QRImage = base64.StdEncoding.EncodeToString(fileBytes)
+	}
+
+	// Save to DB
+	if isNew {
+		if err := middleware.DBConn.Create(&shelterDonations).Error; err != nil {
+			return c.JSON(response.ShelterResponseModel{
+				RetCode: "500",
+				Message: "Failed to create shelter donation info",
+				Data:    err,
+			})
+		}
+	} else {
+		if err := middleware.DBConn.Model(&models.ShelterDonations{}).
+			Where("shelter_id = ?", parsedShelterID).
+			Updates(map[string]interface{}{
+				"account_number": shelterDonations.AccountNumber,
+				"account_name":   shelterDonations.AccountName,
+				"qr_image":       shelterDonations.QRImage,
+			}).Error; err != nil {
+			return c.JSON(response.ShelterResponseModel{
+				RetCode: "500",
+				Message: "Failed to update shelter donation info",
+				Data:    err,
+			})
 		}
 	}
 
 	return c.JSON(response.ShelterResponseModel{
 		RetCode: "200",
-		Message: "All shelters retrieved successfully",
-		Data:    shelters,
+		Message: "Shelter donation info saved successfully",
+		Data:    shelterDonations,
+	})
+}
+
+func ShelterChangePassword(c *fiber.Ctx) error {
+	shelterID := c.Params("id")
+
+	var shelterAccount models.ShelterAccount
+	result := middleware.DBConn.Where("shelter_id = ?", shelterID).First(&shelterAccount)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "400",
+			Message: "Shelter account not found",
+			Data:    nil,
+		})
+	}
+	if result.Error != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error while fetching shelter account",
+			Data:    nil,
+		})
+	}
+
+	// Parse request body with confirm password
+	requestBody := struct {
+		OldPassword     string `json:"old_password"`
+		NewPassword     string `json:"new_password"`
+		ConfirmPassword string `json:"confirm_password"`
+	}{}
+	if err := c.BodyParser(&requestBody); err != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "400",
+			Message: "Invalid request body",
+			Data:    nil,
+		})
+	}
+
+	// Check if new and confirm passwords match
+	if requestBody.NewPassword != requestBody.ConfirmPassword {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "400",
+			Message: "New password and confirm password do not match",
+			Data:    nil,
+		})
+	}
+
+	// Check if old password matches
+	err := bcrypt.CompareHashAndPassword([]byte(shelterAccount.Password), []byte(requestBody.OldPassword))
+	if err != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "400",
+			Message: "Old password is incorrect",
+			Data:    nil,
+		})
+	}
+
+	// Hash the new password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(requestBody.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Failed to hash new password",
+			Data:    nil,
+		})
+	}
+
+	// Update the password in the database
+	shelterAccount.Password = string(hashedPassword)
+	if err := middleware.DBConn.Save(&shelterAccount).Error; err != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Failed to update password",
+			Data:    nil,
+		})
+	}
+
+	return c.JSON(response.ShelterResponseModel{
+		RetCode: "200",
+		Message: "Password updated successfully",
+		Data:    nil,
 	})
 }
 
@@ -576,3 +729,37 @@ func GetShelterByName(c *fiber.Ctx) error {
 		},
 	})
 }
+
+//For Data Analytics
+func CountPetsByShelter(c *fiber.Ctx) error {
+	shelterID := c.Params("id")
+
+	// Check if shelter exists
+	var shelterInfo models.ShelterInfo
+	if err := middleware.DBConn.Where("shelter_id = ?", shelterID).First(&shelterInfo).Error; err != nil {
+		return c.Status(400).JSON(fiber.Map{"message": "Shelter not found"})
+	}
+
+	var available, pending, adopted int64
+
+	middleware.DBConn.Debug().Model(&models.PetInfo{}).Where("shelter_id = ? AND status = ?", shelterID, "available").Count(&available)
+	middleware.DBConn.Model(&models.PetInfo{}).Where("shelter_id = ? AND status = ?", shelterID, "pending").Count(&pending)
+	middleware.DBConn.Model(&models.PetInfo{}).Where("shelter_id = ? AND status = ?", shelterID, "adopted").Count(&adopted)
+
+	return c.Status(200).JSON(fiber.Map{
+		"message": "Counts fetched successfully",
+		"data": fiber.Map{
+			"shelter_id": shelterID,
+			"available":  available,
+			"pending":    pending,
+			"adopted":    adopted,
+		},
+	})
+}
+
+// func GetAdoptionApplication(c *fiber.Ctx) error {
+// 	adopterID := c.Params("adopter_id")
+// 	status := c.Query("status")
+	
+
+// }

@@ -7,8 +7,8 @@ type ShelterAccount struct {
 	ShelterID uint   `gorm:"primaryKey" json:"shelter_id"`
 	Username  string `gorm:"unique;not null" json:"username"`
 	Password  string `json:"password"`
-	Status    string `json:"status"`     // Status can be "Active", "Pending", "Declined", etc.
-	RegStatus string `json:"reg_status"` // Registration status can be "Pending", "Approved", etc.
+	Status    string `gorm:"default:'active'" json:"status"` // Add this line
+	RegStatus string `json:"reg_status"`
 	CreatedAt time.Time
 
 	//Info      ShelterInfo `gorm:"foreignKey:ShelterID;constraint:OnDelete:CASCADE" json:"info"`
@@ -45,4 +45,17 @@ type ShelterMedia struct {
 
 func (ShelterMedia) TableName() string {
 	return "sheltermedia"
+}
+
+type ShelterDonations struct {
+	DonationID    uint   `gorm:"primaryKey;autoIncrement:true" json:"donation_id"`
+	ShelterID     uint   `json:"shelter_id"`
+	AccountNumber string `json:"account_number"`
+	AccountName   string `json:"account_name"`
+	QRImage       string `json:"qr_image"`
+	CreatedAt     time.Time
+}
+
+func (ShelterDonations) TableName() string {
+	return "shelterdonations"
 }

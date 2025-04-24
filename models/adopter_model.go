@@ -7,7 +7,7 @@ type AdopterAccount struct {
 	AdopterID uint   `gorm:"primaryKey" json:"adopter_id"`
 	Username  string `gorm:"unique;not null" json:"username"`
 	Password  string `json:"password"`
-	Status    string `json:"status"`
+	Status    string `gorm:"default:'active'" json:"status"` // Add this line
 	CreatedAt time.Time
 	//Info      AdopterInfo `gorm:"foreignKey:AdopterID;constraint:OnDelete:CASCADE" json:"info"`
 }
