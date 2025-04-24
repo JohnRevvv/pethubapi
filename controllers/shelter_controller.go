@@ -164,6 +164,15 @@ func LoginShelter(c *fiber.Ctx) error {
 		})
 	}
 
+	token, err := middleware.GenerateJWT(ShelterAccount.ShelterID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: "Error generating token",
+			Data:    err.Error(),
+		})
+	}
+
 	// Fetch shelter info
 	var ShelterInfo models.ShelterInfo
 	infoResult := middleware.DBConn.Where("shelter_id = ?", ShelterAccount.ShelterID).First(&ShelterInfo)
@@ -180,6 +189,7 @@ func LoginShelter(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Login successful",
 		"data": fiber.Map{
+			"token":      token,
 			"shelter_id": ShelterAccount.ShelterID, // Include shelter ID in the response
 			"Shelter":    ShelterAccount,
 			"Info":       ShelterInfo,

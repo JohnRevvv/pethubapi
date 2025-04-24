@@ -1,46 +1,96 @@
 package middleware
 
 import (
-	"net/http"
-	"strings"
+	"fmt"
+	"pethub_api/models/response"
+	"log"
+	"os"
+	"time"
 
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/joho/godotenv"
 )
 
-// AuthenticateJWT is a middleware function that extracts and validates JWT tokens
-func AuthenticateJWT() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		tokenString := c.GetHeader("Authorization")
+func init() {
+	err := godotenv.Load() // Load from .env file
+	if err != nil {
+		log.Println("Warning: No .env file found")
+	}
+}
 
-		// Check if the token exists
+// Secret key for signing tokens (should be stored in env variables)
+var SecretKey = os.Getenv("SECRET_KEY")
+
+// GenerateJWT generates a new JWT token
+func GenerateJWT(ID uint) (string, error) {
+	token := jwt.New(jwt.SigningMethodHS256)
+
+	claims := token.Claims.(jwt.MapClaims)
+	claims["id"] = ID
+	claims["exp"] = time.Now().Add(time.Hour * 72).Unix() // Expires in 72 hours
+
+	tokenString, err := token.SignedString([]byte(SecretKey))
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
+func JWTMiddleware() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		tokenString := c.Get("Authorization")
+
 		if tokenString == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing token"})
-			c.Abort()
-			return
+			return c.JSON(response.ResponseModel{
+				RetCode: "401",
+				Message: "Unauthorized: No token provided",
+				Data:    nil,
+			})
 		}
 
-		// Ensure "Bearer" prefix is used
-		tokenParts := strings.Split(tokenString, " ")
-		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token format"})
-			c.Abort()
-			return
+		// Remove "Bearer " prefix if present
+		if len(tokenString) > 7 && tokenString[:7] == "Bearer " {
+			tokenString = tokenString[7:]
 		}
 
-		// Extract token
-		token := tokenParts[1]
+		// var count int64
+		// err := DBConn.Table("token_blacklists").Where("token = ?", tokenString).Count(&count).Error
+		// if err != nil {
+		// 	return c.JSON(response.ResponseModel{
+		// 		RetCode: "500",
+		// 		Message: "Error checking token blacklist",
+		// 		Data:    err,
+		// 	})
+		// }
 
-		// Validate token (You need a `ValidateToken` function)
-		claims, err := ValidateToken(token)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			c.Abort()
-			return
+		// if count > 0 {
+		// 	return c.JSON(response.ResponseModel{
+		// 		RetCode: "401",
+		// 		Message: "Unauthorized: Token is blacklisted",
+		// 		Data:    nil,
+		// 	})
+		// }
+
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method")
+			}
+			return []byte(SecretKey), nil
+		})
+
+		if err != nil || !token.Valid {
+			return c.JSON(response.ResponseModel{
+				RetCode: "401",
+				Message: "Unauthorized: Invalid token",
+				Data:    nil,
+			})
 		}
 
-		// Store the adopter_id in context
-		c.Set("adopter_id", claims.AdopterID)
+		fmt.Println("Token received:", tokenString)
 
-		c.Next()
+		c.Locals("id", token.Claims.(jwt.MapClaims)["id"])
+		return c.Next()
 	}
 }
