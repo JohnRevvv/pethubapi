@@ -16,7 +16,6 @@ import (
 	"gorm.io/gorm"
 )
 
-
 // func GetAllAdopters(c *fiber.Ctx) error {
 // 	// Fetch all adopter accounts
 // 	var adopterAccounts []models.AdopterAccount
@@ -523,54 +522,54 @@ func AdoptionApplication(c *fiber.Ctx) error {
 
 	// Parse form values
 	requestBody := struct {
-		AltFName                 string
-		AltLName                 string
-		Relationship             string
-		AltContactNumber         string
-		AltEmail                 string
-		PetType                  string
-		SpecificShelterAnimal    string
-		IdealPetDescription      string
-		BuildingType             string
-		Rent                     string
-		PetMovePlan              string
-		HouseholdComposition     string
-		AllergiesToAnimals       string
-		CareResponsibility       string
-		FinancialResponsibility  string
-		VacationCarePlan         string
-		AloneTime                string
-		IntroductionPlan         string
-		FamilySupport            string
-		FamilySupportExplanation string
-		OtherPets                string
-		PastPets                 string
-		IDType                   string
+		AltFName                  string
+		AltLName                  string
+		Relationship              string
+		AltContactNumber          string
+		AltEmail                  string
+		PetType                   string
+		SpecificShelterAnimal     string
+		IdealPetDescription       string
+		BuildingType              string
+		Rent                      string
+		PetMovePlan               string
+		HouseholdComposition      string
+		AllergiesToAnimals        string
+		CareResponsibility        string
+		FinancialResponsibility   string
+		VacationCarePlan          string
+		AloneTime                 string
+		IntroductionPlan          string
+		FamilySupport             string
+		FamilySupportExplanation  string
+		OtherPets                 string
+		PastPets                  string
+		IDType                    string
 		PreferredInterviewSetting string
 	}{
-		AltFName:                 c.FormValue("alt_f_name"),
-		AltLName:                 c.FormValue("alt_l_name"),
-		Relationship:             c.FormValue("relationship"),
-		AltContactNumber:         c.FormValue("alt_contact_number"),
-		AltEmail:                 c.FormValue("alt_email"),
-		PetType:                  c.FormValue("pet_type"),
-		SpecificShelterAnimal:    c.FormValue("specific_shelter_animal"),
-		IdealPetDescription:      c.FormValue("ideal_pet_description"),
-		BuildingType:             c.FormValue("building_type"),
-		Rent:                     c.FormValue("rent"),
-		PetMovePlan:              c.FormValue("pet_move_plan"),
-		HouseholdComposition:     c.FormValue("household_composition"),
-		AllergiesToAnimals:       c.FormValue("allergies_to_animals"),
-		CareResponsibility:       c.FormValue("care_responsibility"),
-		FinancialResponsibility:  c.FormValue("financial_responsibility"),
-		VacationCarePlan:         c.FormValue("vacation_care_plan"),
-		AloneTime:                c.FormValue("alone_time"),
-		IntroductionPlan:         c.FormValue("introduction_plan"),
-		FamilySupport:            c.FormValue("family_support"),
-		FamilySupportExplanation: c.FormValue("family_support_explanation"),
-		OtherPets:                c.FormValue("other_pets"),
-		PastPets:                 c.FormValue("past_pets"),
-		IDType:                   c.FormValue("id_type"),
+		AltFName:                  c.FormValue("alt_f_name"),
+		AltLName:                  c.FormValue("alt_l_name"),
+		Relationship:              c.FormValue("relationship"),
+		AltContactNumber:          c.FormValue("alt_contact_number"),
+		AltEmail:                  c.FormValue("alt_email"),
+		PetType:                   c.FormValue("pet_type"),
+		SpecificShelterAnimal:     c.FormValue("specific_shelter_animal"),
+		IdealPetDescription:       c.FormValue("ideal_pet_description"),
+		BuildingType:              c.FormValue("building_type"),
+		Rent:                      c.FormValue("rent"),
+		PetMovePlan:               c.FormValue("pet_move_plan"),
+		HouseholdComposition:      c.FormValue("household_composition"),
+		AllergiesToAnimals:        c.FormValue("allergies_to_animals"),
+		CareResponsibility:        c.FormValue("care_responsibility"),
+		FinancialResponsibility:   c.FormValue("financial_responsibility"),
+		VacationCarePlan:          c.FormValue("vacation_care_plan"),
+		AloneTime:                 c.FormValue("alone_time"),
+		IntroductionPlan:          c.FormValue("introduction_plan"),
+		FamilySupport:             c.FormValue("family_support"),
+		FamilySupportExplanation:  c.FormValue("family_support_explanation"),
+		OtherPets:                 c.FormValue("other_pets"),
+		PastPets:                  c.FormValue("past_pets"),
+		IDType:                    c.FormValue("id_type"),
 		PreferredInterviewSetting: c.FormValue("preferred_interview_setting"),
 	}
 
@@ -634,4 +633,3 @@ func AdoptionApplication(c *fiber.Ctx) error {
 		"message": "Adoption application submitted successfully",
 	})
 }
-

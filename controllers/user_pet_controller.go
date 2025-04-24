@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"pethub_api/middleware"
 	"pethub_api/models"
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -21,15 +22,26 @@ type PetInfo struct {
 	Status         string    `json:"status"`
 	CreatedAt      time.Time `json:"created_at"`
 	PetType        *string   `json:"pet_type"` // Nullable column
+	PetSize        string    `json:"pet_size"`
+	PriorityStatus bool      `json:"priority_status"`
 }
 
 // GetAllPets retrieves all pet records from the petinfo table
 func GetAllPets(c *fiber.Ctx) error {
-	// Create a slice to store all pets
-	var pets []PetInfo
+	// Define a struct to include pet info and the pet_image1 field
+	type PetWithImage struct {
+		PetInfo
+		PetImage1 string `json:"pet_image1"`
+	}
 
-	// Fetch all pets from the database
-	result := middleware.DBConn.Table("petinfo").Find(&pets)
+	// Create a slice to store all pets with images
+	var pets []PetWithImage
+
+	// Fetch all pets and their images from the database
+	result := middleware.DBConn.Table("petinfo").
+		Select("petinfo.*, petmedia.pet_image1").
+		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
+		Find(&pets)
 
 	// Handle errors
 	if result.Error != nil {
@@ -38,42 +50,60 @@ func GetAllPets(c *fiber.Ctx) error {
 		})
 	}
 
-	// Return the list of pets
+	// Return the list of pets with images
 	return c.JSON(pets)
 }
 
 func GetPetByID(c *fiber.Ctx) error {
-	petID := c.Params("id")
+	// Retrieve and sanitize the petID parameter
+	petIDParam := c.Params("id")
+	petID, err := strconv.Atoi(petIDParam) // Convert to integer
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid pet ID format",
+			"error":   err.Error(),
+		})
+	}
 
-	// Fetch shelter info by ID
-	var petInfo models.PetInfo
-	infoResult := middleware.DBConn.Table("petinfo").Where("pet_id = ?", petID).First(&petInfo)
+	// Define a struct to include pet info and the pet_image1 field
+	var petInfo struct {
+		PetID          uint      `json:"pet_id"`
+		ShelterID      uint      `json:"shelter_id"`
+		PetName        string    `json:"pet_name"`
+		PetAge         uint      `json:"pet_age"`
+		PetSex         string    `json:"pet_sex"`
+		PetDescription string    `json:"pet_descriptions"`
+		Status         string    `json:"status"`
+		CreatedAt      time.Time `json:"created_at"`
+		PetType        *string   `json:"pet_type"`
+		PetSize        string    `json:"pet_size"`
+		PriorityStatus bool      `json:"priority_status"`
+		PetImage1      *string   `json:"pet_image1"`
+	}
 
+	// Fetch pet info and its image from the database
+	infoResult := middleware.DBConn.Table("petinfo").
+		Select("petinfo.*, petmedia.pet_image1").
+		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
+		Where("petinfo.pet_id = ?", petID).
+		Scan(&petInfo)
+
+	// Handle errors
 	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"message": "pet info not found",
+			"message": "Pet info not found",
 		})
 	} else if infoResult.Error != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Database error",
+			"error":   infoResult.Error.Error(),
 		})
 	}
 
-	// Fetch shelter account associated with the shelter info
-	var petData models.PetInfo
-	accountResult := middleware.DBConn.Where("pet_id = ?", petID).First(&petData)
-
-	if accountResult.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to fetch pet account",
-		})
-	}
-
+	// Return the pet info with its image
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Shelter info retrieved successfully",
-		"data": fiber.Map{
-			"info": petInfo,
-		},
+		"message": "Pet info retrieved successfully",
+		"data":    petInfo,
 	})
 }
 

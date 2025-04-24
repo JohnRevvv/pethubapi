@@ -35,7 +35,7 @@ func AppRoutes(app *fiber.App) {
 	// Adopter - Pet Related
 	app.Get("/users/petinfo", controllers.GetAllPets)
 	app.Get("/users/pets/:id", controllers.GetPetByID)
-	app.Get("/user/:id/pet", controllers.GetAllPetsInfoByShelterID)
+	app.Get("/user/:id/pet", controllers.GetShelterWithPetsByID)
 
 	// ---------------- Shelter Routes ----------------
 	app.Post("/shelter/register", controllers.RegisterShelter)
