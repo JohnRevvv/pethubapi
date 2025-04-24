@@ -20,7 +20,6 @@ type PetInfo struct {
 	PetSex         string    `json:"pet_sex"`
 	PetDescription string    `json:"pet_descriptions"`
 	Status         string    `json:"status"`
-	PriorityStatus  string    `json:"priority_status"`
 	CreatedAt      time.Time `json:"created_at"`
 	PetType        *string   `json:"pet_type"` // Nullable column
 	PetSize        string    `json:"pet_size"`
