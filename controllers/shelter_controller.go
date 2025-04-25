@@ -114,8 +114,8 @@ func RegisterShelter(c *fiber.Ctx) error {
 func LoginShelter(c *fiber.Ctx) error {
 	// Parse request body
 	requestBody := struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
+		Username  string `json:"username"`
+		Password  string `json:"password"`
 		RegStatus string `json:"reg_status"`
 	}{}
 
@@ -377,7 +377,7 @@ func UploadShelterMedia(c *fiber.Ctx) error {
 	return c.JSON(response.ShelterResponseModel{
 		RetCode: "200",
 		Message: "Shelter media uploaded/updated successfully",
-		Data:  shelterMedia,
+		Data:    shelterMedia,
 	})
 }
 
@@ -740,14 +740,15 @@ func GetShelterByName(c *fiber.Ctx) error {
 	})
 }
 
-//For Data Analytics
 func CountPetsByShelter(c *fiber.Ctx) error {
 	shelterID := c.Params("id")
 
 	// Check if shelter exists
 	var shelterInfo models.ShelterInfo
 	if err := middleware.DBConn.Where("shelter_id = ?", shelterID).First(&shelterInfo).Error; err != nil {
-		return c.Status(400).JSON(fiber.Map{"message": "Shelter not found"})
+		return c.Status(400).JSON(fiber.Map{
+			"message": "Shelter not found",
+		})
 	}
 
 	var available, pending, adopted int64
@@ -767,9 +768,53 @@ func CountPetsByShelter(c *fiber.Ctx) error {
 	})
 }
 
-// func GetAdoptionApplication(c *fiber.Ctx) error {
-// 	adopterID := c.Params("adopter_id")
-// 	status := c.Query("status")
-	
+func GetAdoptionApplication(c *fiber.Ctx) error {
+	shelterID := c.Query("shelter_id") // Assuming shelter_id is passed as a query
+	status := c.Query("status")
 
-// }
+	if status == "" || shelterID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "pet_id and shelter_id are required",
+		})
+	}
+
+	var applications []models.AdoptionSubmission
+	if err := middleware.DBConn.Debug().Where("shelter_id = ? AND status = ?", shelterID, status).Preload("Pet").Preload("Adopter").Preload("Pet.PetMedia").Preload("AdopterProfile.AdopterMedia").Find(&applications).Error; err != nil {
+		return c.JSON(response.ResponseModel{
+			RetCode: "404",
+			Message: "Failed to fetch adoption applications",
+			Data:    err.Error(),
+		})
+	}
+
+	return c.JSON(applications)
+}
+
+func GetApplicationByApplicationID(c *fiber.Ctx) error {
+	applicationID := c.Params("application_id")
+
+	var adoptionSubmission models.AdoptionSubmission
+	infoResult := middleware.DBConn.Debug().Where("application_id = ?", applicationID).First(&adoptionSubmission)
+
+	if infoResult.Error != nil {
+		if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+			return c.JSON(response.AdopterResponseModel{
+				RetCode: "404",
+				Message: "Application not found",
+				Data:    nil,
+			})
+		}
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Something went wrong",
+			Data:    nil,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Adoption details retrieved successfully",
+		"data": fiber.Map{
+			"info": adoptionSubmission,
+		},
+	})
+}
