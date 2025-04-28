@@ -768,28 +768,6 @@ func CountPetsByShelter(c *fiber.Ctx) error {
 	})
 }
 
-func GetSingleAdoptionApplication(c *fiber.Ctx) error {
-	shelterID := c.Query("shelter_id") // Assuming shelter_id is passed as a query
-	status := c.Query("status")
-
-	if status == "" || shelterID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "pet_id and shelter_id are required",
-		})
-	}
-
-	var applications []models.AdoptionSubmission
-	if err := middleware.DBConn.Debug().Where("shelter_id = ? AND status = ?", shelterID, status).Preload("Pet.PetMedia").Preload("Adopter").Find(&applications).Error; err != nil {
-		return c.JSON(response.ResponseModel{
-			RetCode: "404",
-			Message: "Failed to fetch adoption applications",
-			Data:    err.Error(),
-		})
-	}
-
-	return c.JSON(applications)
-}
-
 func GetAdoptionApplications(c *fiber.Ctx) error {
 	shelterID := c.Params("id")
 	status := c.Query("status")
@@ -842,12 +820,15 @@ func GetAdoptionApplications(c *fiber.Ctx) error {
 	return c.JSON(responses)
 }
 
-
 func GetApplicationByApplicationID(c *fiber.Ctx) error {
 	applicationID := c.Params("application_id")
 
 	var adoptionSubmission models.AdoptionSubmission
-	infoResult := middleware.DBConn.Debug().Where("application_id = ?", applicationID).First(&adoptionSubmission)
+	infoResult := middleware.DBConn.Debug().Where("application_id = ?", applicationID).
+	Preload("Adopter").
+	Preload("Adopter.AdopterMedia"). // Preload adopter media
+	Preload("Pet").
+	Preload("Pet.PetMedia").First(&adoptionSubmission)
 
 	if infoResult.Error != nil {
 		if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {

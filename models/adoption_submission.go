@@ -26,10 +26,8 @@ type AdoptionSubmission struct {
 	InterviewSetting    string    `json:"interview_setting"`
 	ValidID             string    `json:"valid_id" gorm:"not null"`     // For adopter
 	AltValidID          string    `json:"alt_valid_id" gorm:"not null"` // For alternate contact
-	Status              string    `json:"status" gorm:"type:varchar(20);default:'Pending'"`
-	CreatedAt           time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt           time.Time `json:"updated_at" gorm:"autoUpdateTime"`
-	DeletedAt           time.Time `json:"deleted_at"`
+	Status              string    `json:"status" gorm:"type:varchar(20);default:'pending'"`
+	CreatedAt           time.Time 
 
 	// Shelter ShelterInfo `json:"shelter"`
 	Adopter AdopterInfo `json:"adopter"`

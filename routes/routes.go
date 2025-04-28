@@ -60,6 +60,7 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Put("/shelter/:id/change-password", controllers.ShelterChangePassword)
 	pethubRoutes.Put("/shelter/:id/pet/update-priority-status", controllers.UpdatePriorityStatus)
 	pethubRoutes.Get("/shelter/:id/adoption-applications", controllers.GetAdoptionApplications)
+	pethubRoutes.Get("/shelter/:application_id/application-details", controllers.GetApplicationByApplicationID)
 
 	// ---------------- General Shared Routes ----------------s
 	app.Get("/allshelter", controllers.GetShelter)
