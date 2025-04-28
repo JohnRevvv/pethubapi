@@ -2,8 +2,6 @@ package models
 
 import (
 	"time"
-
-
 )
 
 // AdopterAccount model (linked to existing "adopteraccount" table)
@@ -23,18 +21,18 @@ func (AdopterAccount) TableName() string {
 
 // AdopterInfo model (linked to existing "adopterinfo" table)
 type AdopterInfo struct {
-	AdopterID      uint         `gorm:"primaryKey;autoIncrement:false" json:"adopter_id"`
-	FirstName      string       `json:"first_name"`
-	LastName       string       `json:"last_name"`
-	Age            int          `json:"age"`
-	Sex            string       `json:"sex"`
-	Address        string       `json:"address"`
-	ContactNumber  string       `json:"contact_number"`
-	Email          string       `gorm:"unique" json:"email"`
-	Occupation     string       `json:"occupation"`
-	CivilStatus    string       `json:"civil_status"`
-	SocialMedia    string       `json:"social_media"`
-	AdopterProfile AdopterMedia `gorm:"foreignKey:AdopterID;references:AdopterID" json:"adoptermedia"`
+	AdopterID     uint         `gorm:"primaryKey;autoIncrement:false" json:"adopter_id"`
+	FirstName     string       `json:"first_name"`
+	LastName      string       `json:"last_name"`
+	Age           int          `json:"age"`
+	Sex           string       `json:"sex"`
+	Address       string       `json:"address"`
+	ContactNumber string       `json:"contact_number"`
+	Email         string       `gorm:"unique" json:"email"`
+	Occupation    string       `json:"occupation"`
+	CivilStatus   string       `json:"civil_status"`
+	SocialMedia   string       `json:"social_media"`
+	AdopterMedia  AdopterMedia `gorm:"foreignKey:AdopterID;references:AdopterID" json:"adoptermedia"`
 }
 
 // TableName overrides default table name
@@ -53,12 +51,9 @@ func (AdopterMedia) TableName() string {
 
 type AdoptedPet struct {
 	AdoptedID uint `gorm:"column:adopted_id;primaryKey;autoIncrement" json:"adopted_id"`
-
 	AdopterID uint `gorm:"column:adopter_id" json:"adopter_id"`
-
-	PetID uint `gorm:"column:pet_id" json:"pet_id"`
+	PetID     uint `gorm:"column:pet_id" json:"pet_id"`
 }
-
 
 func (AdoptedPet) TableName() string {
 	return "adopterpets"

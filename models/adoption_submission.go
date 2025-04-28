@@ -6,13 +6,10 @@ import (
 
 type AdoptionSubmission struct {
 	// Application Info
-	CreatedAt           time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt           time.Time `json:"updated_at" gorm:"autoUpdateTime"`
-	DeletedAt           time.Time `json:"deleted_at"`
 	ApplicationID       uint      `json:"application_id" gorm:"primaryKey;autoIncrement"`
-	ShelterID           uint      `gorm:"not null" json:"shelter_id"`
-	PetID               uint      `json:"pet_id" gorm:"not null"`
-	AdopterID           uint      `json:"adopter_id" gorm:"not null"`
+	ShelterID           uint      `json:"shelter_id"`
+	PetID               uint      `json:"pet_id"`
+	AdopterID           uint      `json:"adopter_id"`
 	AltFName            string    `json:"alt_f_name" gorm:"not null"`
 	AltLName            string    `json:"alt_l_name" gorm:"not null"`
 	Relationship        string    `json:"relationship" gorm:"not null"`
@@ -30,10 +27,13 @@ type AdoptionSubmission struct {
 	ValidID             string    `json:"valid_id" gorm:"not null"`     // For adopter
 	AltValidID          string    `json:"alt_valid_id" gorm:"not null"` // For alternate contact
 	Status              string    `json:"status" gorm:"type:varchar(20);default:'Pending'"`
+	CreatedAt           time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt           time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt           time.Time `json:"deleted_at"`
 
-	// Shelter ShelterInfo `gorm:"foreignKey:ShelterID;references:ShelterID" json:"shelter"`
-	// Adopter AdopterInfo `gorm:"foreignKey:AdopterID;references:AdopterID" json:"adopter"`
-	// Pet     PetInfo     `gorm:"foreignKey:PetID;references:PetID" json:"pet"`
+	// Shelter ShelterInfo `json:"shelter"`
+	Adopter AdopterInfo `json:"adopter"`
+	Pet     PetInfo     `json:"pet"`
 }
 
 // TableName overrides default table name

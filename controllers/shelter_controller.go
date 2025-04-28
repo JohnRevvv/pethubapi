@@ -768,7 +768,7 @@ func CountPetsByShelter(c *fiber.Ctx) error {
 	})
 }
 
-func GetAdoptionApplication(c *fiber.Ctx) error {
+func GetSingleAdoptionApplication(c *fiber.Ctx) error {
 	shelterID := c.Query("shelter_id") // Assuming shelter_id is passed as a query
 	status := c.Query("status")
 
@@ -779,7 +779,7 @@ func GetAdoptionApplication(c *fiber.Ctx) error {
 	}
 
 	var applications []models.AdoptionSubmission
-	if err := middleware.DBConn.Debug().Where("shelter_id = ? AND status = ?", shelterID, status).Preload("Pet").Preload("Adopter").Preload("Pet.PetMedia").Preload("AdopterProfile.AdopterMedia").Find(&applications).Error; err != nil {
+	if err := middleware.DBConn.Debug().Where("shelter_id = ? AND status = ?", shelterID, status).Preload("Pet.PetMedia").Preload("Adopter").Find(&applications).Error; err != nil {
 		return c.JSON(response.ResponseModel{
 			RetCode: "404",
 			Message: "Failed to fetch adoption applications",
@@ -789,6 +789,59 @@ func GetAdoptionApplication(c *fiber.Ctx) error {
 
 	return c.JSON(applications)
 }
+
+func GetAdoptionApplications(c *fiber.Ctx) error {
+	shelterID := c.Params("id")
+	status := c.Query("status")
+
+	if status == "" || shelterID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "shelter_id and status are required",
+		})
+	}
+
+	// Create a custom struct just for the response
+	type AdoptionApplicationResponse struct {
+		ApplicationID  uint   `json:"application_id"`
+		FirstName      string `json:"first_name"`
+		LastName       string `json:"last_name"`
+		AdopterProfile string `json:"adopter_profile"`
+		PetName        string `json:"pet_name"`
+		Status         string `json:"status"`
+	}
+
+	var applications []models.AdoptionSubmission
+	var responses []AdoptionApplicationResponse
+
+	// Fetch the adoption submissions with related data
+	if err := middleware.DBConn.Debug().
+		Where("shelter_id = ? AND status = ?", shelterID, status).
+		Preload("Adopter").
+		Preload("Adopter.AdopterMedia"). // Preload adopter media
+		Preload("Pet").                  // Preload pet data
+		Find(&applications).Error; err != nil {
+		return c.JSON(response.ResponseModel{
+			RetCode: "404",
+			Message: "Failed to fetch adoption applications",
+			Data:    err.Error(),
+		})
+	}
+
+	// Format the response to match the required fields
+	for _, app := range applications {
+		responses = append(responses, AdoptionApplicationResponse{
+			ApplicationID:  app.ApplicationID,
+			FirstName:      app.Adopter.FirstName,
+			LastName:       app.Adopter.LastName,
+			AdopterProfile: app.Adopter.AdopterMedia.AdopterProfile, // Assuming `ProfileURL` is the field for the profile image
+			PetName:        app.Pet.PetName,                         // Assuming `PetName` is the pet's name field
+			Status:         app.Status,
+		})
+	}
+
+	return c.JSON(responses)
+}
+
 
 func GetApplicationByApplicationID(c *fiber.Ctx) error {
 	applicationID := c.Params("application_id")
