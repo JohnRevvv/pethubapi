@@ -229,3 +229,4 @@ func encodeFileToBase64(fileHeader *multipart.FileHeader) (string, error) {
 
 	return base64.StdEncoding.EncodeToString(fileData), nil
 }
+

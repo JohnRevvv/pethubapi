@@ -2,25 +2,11 @@ package routes
 
 import (
 	"pethub_api/controllers"
-	adoptionform "pethub_api/controllers/adoptionform"
-	"pethub_api/middleware"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 func AppRoutes(app *fiber.App) {
-
-	// Middleware for JWT validation
-
-	// protcted routes?
-	//jwt := app.Group("/api", middleware.ValidateJWTMiddleware)
-
-	//app.Post("/adoption-application/:pet_id", middleware.ValidateJWTMiddleware, adoptionform.SubmitAdoptionApplication)
-
-	//jwt.Post("/questionnaires", adoptionform.CreateQuestionnaire)
-	// pakyu
-	app.Post("/submission/:pet_id", middleware.ValidateJWTMiddleware, adoptionform.CreateAdoptionSubmission)
-
 	// ---------------- Admin Routes ----------------
 	app.Post("/admin/register", controllers.RegisterAdmin)
 	app.Post("/admin/login", controllers.LoginAdmin)
@@ -54,25 +40,27 @@ func AppRoutes(app *fiber.App) {
 	// ---------------- Shelter Routes ----------------
 	app.Post("/shelter/register", controllers.RegisterShelter)
 	app.Post("/shelter/login", controllers.LoginShelter)
-	app.Get("/shelters", controllers.GetAllShelters)
-	app.Get("/shelter", controllers.GetShelterByName)
-	app.Get("/shelter/:id", controllers.GetShelterInfoByID)
-	app.Put("/shelter/:id/update-info", controllers.UpdateShelterDetails)
-	app.Post("/shelter/:id/upload-media", controllers.UploadShelterMedia)
-	app.Post("/shelter/:id/add-pet-info", controllers.AddPetInfo)
-	app.Get("/shelter/:id/petinfo", controllers.GetPetInfoByPetID)
-	app.Put("/shelter/:id/update-pet-info", controllers.UpdatePetInfo)
-	app.Put("/shelter/:id/archive-pet", controllers.SetPetStatusToArchive)
-	app.Put("/shelter/:id/unarchive-pet", controllers.SetPetStatusToUnarchive)
-	app.Get("/shelter/:id/petcount", controllers.CountPetsByShelter)
-	app.Get("/filter/:id/pets/search", controllers.FetchAndSearchPets)
-	app.Get("/shelter/archive/pets/:id/search", controllers.FetchAndSearchArchivedPets)
-	app.Get("/shelter/:id/get/donationinfo", controllers.GetShelterDonationInfo)
-	app.Put("/shelter/:id/update/donationinfo", controllers.UpdateShelterDonations)
-	app.Put("/shelter/:id/change-password", controllers.ShelterChangePassword)
-	app.Put("/shelter/:id/pet/update-priority-status", controllers.UpdatePriorityStatus)
+	pethubRoutes.Get("/shelters", controllers.GetAllShelters)
+	pethubRoutes.Get("/shelter", controllers.GetShelterByName)
+	pethubRoutes.Get("/shelter/:id", controllers.GetShelterInfoByID)
+	pethubRoutes.Put("/shelter/:id/update-info", controllers.UpdateShelterDetails)
+	pethubRoutes.Post("/shelter/:id/upload-media", controllers.UploadShelterMedia)
+	pethubRoutes.Post("/shelter/:id/add-pet-info", controllers.AddPetInfo)
+	pethubRoutes.Get("/shelter/:id/petinfo", controllers.GetPetInfoByPetID)
+	pethubRoutes.Put("/shelter/:id/update-pet-info", controllers.UpdatePetInfo)
+	pethubRoutes.Put("/shelter/:id/archive-pet", controllers.SetPetStatusToArchive)
+	pethubRoutes.Put("/shelter/:id/unarchive-pet", controllers.SetPetStatusToUnarchive)
+	pethubRoutes.Get("/shelter/:id/petcount", controllers.CountPetsByShelter)
+	pethubRoutes.Get("/filter/:id/pets/search", controllers.FetchAndSearchPets)
+	pethubRoutes.Get("/shelter/archive/pets/:id/search", controllers.FetchAndSearchArchivedPets)
+	pethubRoutes.Get("/shelter/:id/get/donationinfo", controllers.GetShelterDonationInfo)
+	pethubRoutes.Put("/shelter/:id/update/donationinfo", controllers.UpdateShelterDonations)
+	pethubRoutes.Put("/shelter/:id/change-password", controllers.ShelterChangePassword)
+	pethubRoutes.Put("/shelter/:id/pet/update-priority-status", controllers.UpdatePriorityStatus)
+	pethubRoutes.Get("/shelter/:id/adoption-applications", controllers.GetAdoptionApplications)
+	pethubRoutes.Get("/shelter/:application_id/application-details", controllers.GetApplicationByApplicationID)
 
-	// ---------------- General Shared Routes ----------------
+	// ---------------- General Shared Routes ----------------s
 	app.Get("/allshelter", controllers.GetShelter)
 	app.Get("/users/shelters/:id", controllers.GetAllSheltersByID)
 
@@ -85,4 +73,6 @@ func AppRoutes(app *fiber.App) {
 	app.Post("/adopter/verify-code", controllers.AdopterVerifyResetCode)
 	app.Post("/adopter/reset-password", controllers.AdopterResetPassword)
 
+	// ---------------- Adoption Application ----------------
+	app.Post("/adoption/application/:adopter_id/:pet_id", controllers.AdoptionApplication)
 }

@@ -30,7 +30,7 @@ func AuthenticateJWT() gin.HandlerFunc {
 		// Extract token
 		token := tokenParts[1]
 
-		// Validate token (You need a `ValidateToken` function)
+		// Validate token (You need a ValidateToken function)
 		claims, err := ValidateToken(token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
