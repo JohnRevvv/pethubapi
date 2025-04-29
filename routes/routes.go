@@ -2,11 +2,13 @@ package routes
 
 import (
 	"pethub_api/controllers"
+	"pethub_api/middleware"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 func AppRoutes(app *fiber.App) {
+	pethubRoutes := app.Group("/api", middleware.JWTMiddleware())
 	// ---------------- Admin Routes ----------------
 	app.Post("/admin/register", controllers.RegisterAdmin)
 	app.Post("/admin/login", controllers.LoginAdmin)
@@ -74,5 +76,5 @@ func AppRoutes(app *fiber.App) {
 	app.Post("/adopter/reset-password", controllers.AdopterResetPassword)
 
 	// ---------------- Adoption Application ----------------
-	app.Post("/adoption/application/:adopter_id/:pet_id", controllers.AdoptionApplication)
+	// app.Post("/adoption/application/:adopter_id/:pet_id", controllers.AdoptionApplication)
 }
