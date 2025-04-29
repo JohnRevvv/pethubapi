@@ -6,6 +6,7 @@ type AdoptionSubmission struct {
 	// Application Info
 	ApplicationID    uint   `json:"application_id" gorm:"primaryKey;autoIncrement"`
 	PetID            uint   `json:"pet_id" gorm:"not null"`
+	ShelterID        uint   `json:"shelter_id" gorm:"not null"`
 	AdopterID        uint   `json:"adopter_id" gorm:"not null"`
 	AltFName         string `json:"alt_f_name" gorm:"not null"`
 	AltLName         string `json:"alt_l_name" gorm:"not null"`
@@ -27,6 +28,10 @@ type AdoptionSubmission struct {
 	// Upload fields (just store file paths)
 	ValidID    string `json:"valid_id" gorm:"not null"`     // For adopter
 	AltValidID string `json:"alt_valid_id" gorm:"not null"` // For alternate contact
+
+	// Add relationships (below existing fields but above Common Fields)
+	Pet     PetInfo        `gorm:"foreignKey:PetID" json:"pet"`
+	Shelter ShelterAccount `gorm:"foreignKey:ShelterID" json:"shelter"`
 
 	// Common Fields
 	Status    string    `json:"status" gorm:"type:varchar(20);default:'Pending'"`

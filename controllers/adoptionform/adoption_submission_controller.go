@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"mime/multipart"
 	"strconv"
+	"strings"
 	"time"
 
 	"pethub_api/middleware"
@@ -18,6 +19,14 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 	petID, err := strconv.Atoi(petIDStr)
 	if err != nil || petID == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid or missing petID"})
+	}
+
+	// First fetch the pet to get its ShelterID
+	var pet models.PetInfo
+	if err := middleware.DBConn.Where("pet_id = ?", petID).First(&pet).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Pet not found",
+		})
 	}
 
 	adopterID, err := middleware.GetAdopterIDFromJWT(c)
@@ -44,6 +53,48 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 	pastPets := c.FormValue("pastPets")
 	interviewSetting := c.FormValue("interviewSetting")
 
+	// Basic input validation
+	if altFName == "" || altLName == "" || relationship == "" || altContactNumber == "" || altEmail == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Alternate contact fields are required.",
+		})
+	}
+
+	if petType == "" || idealPetDescription == "" || housingSituation == "" || petsAtHome == "" || allergies == "" || familySupport == "" || pastPets == "" || interviewSetting == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Please complete all required questionnaire fields.",
+		})
+	}
+
+	// Contact number validation
+	if len(altContactNumber) < 11 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Contact numbers must be at least 11 digits.",
+		})
+	}
+	for _, ch := range altContactNumber {
+		if ch < '0' || ch > '9' {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Contact number must only contain digits.",
+			})
+		}
+	}
+
+	// Email format validation (basic)
+	if !strings.Contains(altEmail, "@") || !strings.Contains(altEmail, ".") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid alternate email format.",
+		})
+	}
+
+	// Duplicate altEmail check (globally unique)
+	var existingSubmission models.AdoptionSubmission
+	if err := middleware.DBConn.Where("alt_email = ?", altEmail).First(&existingSubmission).Error; err == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Alternate email is already used in a previous submission. Please use a different one.",
+		})
+	}
+
 	tx := middleware.DBConn.Begin()
 	if tx == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to begin DB transaction"})
@@ -52,6 +103,7 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 	submission := models.AdoptionSubmission{
 		AdopterID:           adopterID,
 		PetID:               uint(petID),
+		ShelterID:           pet.ShelterID, // Added ShelterID from pet
 		AltFName:            altFName,
 		AltLName:            altLName,
 		Relationship:        relationship,
@@ -159,6 +211,7 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message":    "Adoption submission successful",
 		"submission": submission,
+		"shelter_id": pet.ShelterID, // Optionally include shelter_id in response
 	})
 }
 

@@ -2,11 +2,25 @@ package routes
 
 import (
 	"pethub_api/controllers"
+	adoptionform "pethub_api/controllers/adoptionform"
+	"pethub_api/middleware"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 func AppRoutes(app *fiber.App) {
+
+	// Middleware for JWT validation
+
+	// protcted routes?
+	//jwt := app.Group("/api", middleware.ValidateJWTMiddleware)
+
+	//app.Post("/adoption-application/:pet_id", middleware.ValidateJWTMiddleware, adoptionform.SubmitAdoptionApplication)
+
+	//jwt.Post("/questionnaires", adoptionform.CreateQuestionnaire)
+	// pakyu
+	app.Post("/submission/:pet_id", middleware.ValidateJWTMiddleware, adoptionform.CreateAdoptionSubmission)
+
 	// ---------------- Admin Routes ----------------
 	app.Post("/admin/register", controllers.RegisterAdmin)
 	app.Post("/admin/login", controllers.LoginAdmin)
@@ -71,6 +85,4 @@ func AppRoutes(app *fiber.App) {
 	app.Post("/adopter/verify-code", controllers.AdopterVerifyResetCode)
 	app.Post("/adopter/reset-password", controllers.AdopterResetPassword)
 
-	// ---------------- Adoption Application ----------------
-	app.Post("/adoption/application/:adopter_id/:pet_id", controllers.AdoptionApplication)
 }
