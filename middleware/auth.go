@@ -54,25 +54,7 @@ func JWTMiddleware() fiber.Handler {
 		if len(tokenString) > 7 && tokenString[:7] == "Bearer " {
 			tokenString = tokenString[7:]
 		}
-
-		// var count int64
-		// err := DBConn.Table("token_blacklists").Where("token = ?", tokenString).Count(&count).Error
-		// if err != nil {
-		// 	return c.JSON(response.ResponseModel{
-		// 		RetCode: "500",
-		// 		Message: "Error checking token blacklist",
-		// 		Data:    err,
-		// 	})
-		// }
-
-		// if count > 0 {
-		// 	return c.JSON(response.ResponseModel{
-		// 		RetCode: "401",
-		// 		Message: "Unauthorized: Token is blacklisted",
-		// 		Data:    nil,
-		// 	})
-		// }
-
+		
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method")

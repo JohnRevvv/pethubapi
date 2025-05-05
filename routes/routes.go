@@ -9,20 +9,6 @@ import (
 
 func AppRoutes(app *fiber.App) {
 	pethubRoutes := app.Group("/api", middleware.JWTMiddleware())
-	// ---------------- Admin Routes ----------------
-	app.Post("/admin/register", controllers.RegisterAdmin)
-	app.Post("/admin/login", controllers.LoginAdmin)
-	app.Get("/admin/getallpendingrequest", controllers.GetAllPendingRequests)
-	app.Get("/admin/getalladopters", controllers.GetAllAdopters)
-	app.Get("/admin/getallshelters", controllers.GetAllShelters)
-	app.Post("/admin/updateregstatus", controllers.UpdateRegistrationStatus)
-	app.Post("/admin/updateshelterstatus", controllers.UpdateShelterStatus)
-	app.Post("/admin/updateadopterstatus", controllers.UpdateAdopterStatus)
-
-	//try
-	app.Get("/admin/getallshelterstry", controllers.GetAllSheltersAdmintry) // Route to get all shelters by id
-	app.Put("/admin/shelters/:id/approve", controllers.ApproveShelterRegStatus)
-
 	// ---------------- Adopter Routes ----------------
 	app.Post("/user/register", controllers.RegisterAdopter)
 	app.Post("/user/login", controllers.LoginAdopter)
@@ -33,6 +19,7 @@ func AppRoutes(app *fiber.App) {
 	app.Post("/users/:id/upload-media", controllers.UploadAdopterMedia)
 	app.Get("/adopter/:id", controllers.GetAdopterProfile)
 	app.Put("/adopter/:id", controllers.EditAdopterProfile)
+	app.Post("/adopter/:shelter_id/:pet_id/:adopter_id/adoption", controllers.CreateAdoption)
 
 	// Adopter - Pet Related
 	app.Get("/users/petinfo", controllers.GetAllPets)
@@ -51,7 +38,7 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Get("/shelter/:id", controllers.GetShelterInfoByID)
 	pethubRoutes.Put("/shelter/:id/update-info", controllers.UpdateShelterDetails)
 	pethubRoutes.Post("/shelter/:id/upload-media", controllers.UploadShelterMedia)
-	pethubRoutes.Post("/shelter/:id/add-pet-info", controllers.AddPetInfo)
+	// pethubRoutes.Post("/shelter/:id/add-pet-info", controllers.AddPetInfo)
 	pethubRoutes.Get("/shelter/:id/petinfo", controllers.GetPetInfoByPetID)
 	pethubRoutes.Put("/shelter/:id/update-pet-info", controllers.UpdatePetInfo)
 	pethubRoutes.Put("/shelter/:id/archive-pet", controllers.SetPetStatusToArchive)
@@ -65,6 +52,8 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Put("/shelter/:id/pet/update-priority-status", controllers.UpdatePriorityStatus)
 	pethubRoutes.Get("/shelter/:id/adoption-applications", controllers.GetAdoptionApplications)
 	pethubRoutes.Get("/shelter/:application_id/application-details", controllers.GetApplicationByApplicationID)
+	pethubRoutes.Get("/shelterinfo/:shelter_id", controllers.GetShelterInfo)
+	pethubRoutes.Post("/shelter/:shelter_id/add-pet",controllers.AddPetInfo2)
 
 	// ---------------- General Shared Routes ----------------s
 	app.Get("/allshelter", controllers.GetShelter)

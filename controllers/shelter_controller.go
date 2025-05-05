@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"pethub_api/middleware"
 	"pethub_api/models"
@@ -15,6 +16,76 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
+
+func GetShelterInfo(c *fiber.Ctx) error {
+	ShelterID := c.Params("shelter_id")
+
+	var ShelterInfo models.ShelterInfo
+	Result := middleware.DBConn.Debug().Preload("ShelterMedia").Where("shelter_id = ?", ShelterID).First(&ShelterInfo)
+
+	if errors.Is(Result.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "404",
+			Message: "Shelter Not Found",
+			Data:    nil,
+		})
+	} else if Result.Error != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error while fetching shelter info",
+			Data:    Result.Error,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(response.ShelterResponseModel{
+		RetCode: "200",
+		Message: "Success",
+		Data:    ShelterInfo,
+	})
+}
+
+func GetAllShelters(c *fiber.Ctx) error {
+	var accounts []models.ShelterAccount
+	if err := middleware.DBConn.Find(&accounts).Error; err != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "400",
+			Message: "Failed to fetch shelter accounts",
+			Data:    nil,
+		})
+	}
+
+	var infos []models.ShelterInfo
+	if err := middleware.DBConn.Find(&infos).Error; err != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "400",
+			Message: "Failed to fetch shelter info",
+			Data:    nil,
+		})
+	}
+
+	// Create a map of ShelterID to ShelterInfo for faster lookup
+	infoMap := make(map[uint]models.ShelterInfo)
+	for _, info := range infos {
+		infoMap[info.ShelterID] = info
+	}
+
+	// Combine data
+	shelters := []fiber.Map{}
+	for _, account := range accounts {
+		if info, ok := infoMap[account.ShelterID]; ok {
+			shelters = append(shelters, fiber.Map{
+				"shelter": account,
+				"info":    info,
+			})
+		}
+	}
+
+	return c.JSON(response.ShelterResponseModel{
+		RetCode: "200",
+		Message: "All shelters retrieved successfully",
+		Data:    shelters,
+	})
+}
 
 func RegisterShelter(c *fiber.Ctx) error {
 	// Parse request body
@@ -390,7 +461,7 @@ func GetShelterInfoByID(c *fiber.Ctx) error {
 
 	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
 		return c.JSON(response.ShelterResponseModel{
-			RetCode: "400",
+			RetCode: "404",
 			Message: "Shelter info not found",
 			Data:    nil,
 		})
@@ -825,10 +896,11 @@ func GetApplicationByApplicationID(c *fiber.Ctx) error {
 
 	var adoptionSubmission models.AdoptionSubmission
 	infoResult := middleware.DBConn.Debug().Where("application_id = ?", applicationID).
-	Preload("Adopter").
-	Preload("Adopter.AdopterMedia"). // Preload adopter media
-	Preload("Pet").
-	Preload("Pet.PetMedia").First(&adoptionSubmission)
+		Preload("Adopter").
+		Preload("Adopter.AdopterMedia"). 
+		Preload("Pet").
+		Preload("ValidIDs").
+		Preload("Pet.PetMedia").First(&adoptionSubmission)
 
 	if infoResult.Error != nil {
 		if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
@@ -837,12 +909,13 @@ func GetApplicationByApplicationID(c *fiber.Ctx) error {
 				Message: "Application not found",
 				Data:    nil,
 			})
+		} else{
+			return c.JSON(response.AdopterResponseModel{
+				RetCode: "500",
+				Message: "Something went wrong",
+				Data:    nil,
+			})
 		}
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "500",
-			Message: "Something went wrong",
-			Data:    nil,
-		})
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
@@ -852,3 +925,93 @@ func GetApplicationByApplicationID(c *fiber.Ctx) error {
 		},
 	})
 }
+
+func AddPetInfo2(c *fiber.Ctx) error {
+	// Get ShelterID from route
+	shelterIDParam := c.Params("shelter_id")
+	shelterID, err := strconv.ParseUint(shelterIDParam, 10, 32)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid Shelter ID",
+		})
+	}
+
+	// Parse pet age
+	petAgeStr := c.FormValue("pet_age")
+	petAge, err := strconv.Atoi(petAgeStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid pet age",
+		})
+	}
+
+	// Create PetInfo
+	pet := models.PetInfo{
+		ShelterID:       uint(shelterID),
+		PetType:         c.FormValue("pet_type"),
+		PetName:         c.FormValue("pet_name"),
+		PetAge:          petAge,
+		AgeType:         c.FormValue("age_type"),
+		PetSex:          c.FormValue("pet_sex"),
+		PetSize:         c.FormValue("pet_size"),
+		PetDescriptions: c.FormValue("pet_descriptions"),
+		PriorityStatus:  c.FormValue("priority_status") == "1",
+		CreatedAt:       time.Now(),
+	}
+
+	tx := middleware.DBConn.Begin()
+	if err := tx.Create(&pet).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to save pet info",
+		})
+	}
+
+	// Handle image
+	var petImageBase64 string
+	file, err := c.FormFile("pet_image1")
+	if file != nil && err == nil {
+		openFile, err := file.Open()
+		if err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Failed to open uploaded image",
+			})
+		}
+		defer openFile.Close()
+
+		imageBytes, err := io.ReadAll(openFile)
+		if err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Failed to read uploaded image",
+			})
+		}
+		petImageBase64 = base64.StdEncoding.EncodeToString(imageBytes)
+	} else {
+		petImageBase64 = c.FormValue("pet_image1") // fallback to base64 string form value
+	}
+
+	petMedia := models.PetMedia{
+		PetID:     pet.PetID,
+		PetImage1: petImageBase64,
+	}
+
+	if err := tx.Create(&petMedia).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to save pet image",
+		})
+	}
+
+	tx.Commit()
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "Pet added successfully",
+		"data": fiber.Map{
+			"pet_info": pet,
+			"image":    petMedia,
+		},
+	})
+}
+

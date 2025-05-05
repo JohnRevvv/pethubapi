@@ -4,11 +4,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"strconv"
 	"time"
 
 	"pethub_api/middleware"
 	"pethub_api/models"
+	"pethub_api/models/response"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
@@ -105,12 +107,6 @@ func RegisterAdopter(c *fiber.Ctx) error {
 	})
 }
 
-// ==============================================================
-
-// LoginAdopter authenticates an adopter and retrieves their info
-
-// ==============================================================
-
 func LoginAdopter(c *fiber.Ctx) error {
 	// Parse request body
 	requestBody := struct {
@@ -180,18 +176,22 @@ func GetAllAdopters(c *fiber.Ctx) error {
 	accountResult := middleware.DBConn.Find(&adopterAccounts)
 
 	if accountResult.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to fetch adopter accounts",
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "400",
+			Message: "Failed to fetch adopter info",
+			Data:    nil,
 		})
 	}
 
 	// Fetch all adopter info
 	var adopterInfos []models.AdopterInfo
-	infoResult := middleware.DBConn.Find(&adopterInfos)
+	infoResult := middleware.DBConn.Preload("AdopterMedia").Find(&adopterInfos)
 
 	if infoResult.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to fetch adopter info",
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "400",
+			Message: "Failed to fetch adopter info",
+			Data:    nil,
 		})
 	}
 
@@ -223,12 +223,16 @@ func GetAdopterInfoByID(c *fiber.Ctx) error {
 	infoResult := middleware.DBConn.Where("adopter_id = ?", adopterID).First(&adopterInfo)
 
 	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"message": "Adopter info not found",
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "404",
+			Message: "Adopter not found",
+			Data:    nil,
 		})
 	} else if infoResult.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Database error while fetching adopter info",
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Database error",
+			Data:    nil,
 		})
 	}
 
@@ -241,15 +245,19 @@ func GetAdopterInfoByID(c *fiber.Ctx) error {
 	if errors.Is(mediaResult.Error, gorm.ErrRecordNotFound) {
 		mediaResponse = nil
 	} else if mediaResult.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Database error while fetching adopter media",
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Database error",
+			Data:    nil,
 		})
 	} else {
 		// Decode Base64-encoded images
 		decodedProfile, err := base64.StdEncoding.DecodeString(adopterMedia.AdopterProfile)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "Failed to decode profile image",
+			return c.JSON(response.AdopterResponseModel{
+				RetCode: "400",
+				Message: "Failed to decode profile image",
+				Data:    nil,
 			})
 		}
 
@@ -340,15 +348,19 @@ func GetPetsByAdopterID(c *fiber.Ctx) error {
 	// Retrieve the adopter ID from the URL parameter
 	idParam := c.Params("id")
 	if idParam == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Adopter ID parameter is missing",
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "404",
+			Message: "ID not found",
+			Data:    nil,
 		})
 	}
 
 	adopterID, err := strconv.Atoi(idParam)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid adopter ID",
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "400",
+			Message: "Invalid ID",
+			Data:    nil,
 		})
 	}
 
@@ -392,100 +404,251 @@ func GetPetsByAdopterID(c *fiber.Ctx) error {
 	})
 }
 
-// func GetAllPetsInfoByShelterID(c *fiber.Ctx) error {
-// 	shelterID := c.Params("id")
-
-// 	// Fetch pet information by shelter ID with pet_image1 from petmedia
-// 	var petInfo []struct {
-// 		PetID          uint      `json:"pet_id"`
-// 		ShelterID      uint      `json:"shelter_id"`
-// 		PetName        string    `json:"pet_name"`
-// 		PetAge         uint      `json:"pet_age"`
-// 		PetSex         string    `json:"pet_sex"`
-// 		PetDescription string    `json:"pet_descriptions"`
-// 		Status         string    `json:"status"`
-// 		CreatedAt      time.Time `json:"created_at"`
-// 		PetType        *string   `json:"pet_type"`
-// 		PetImage1      *string   `json:"pet_image1"`
-// 	}
-
-// 	// Query the database with a join
-// 	infoResult := middleware.DBConn.Table("petinfo").
-// 		Select("petinfo.pet_id, petinfo.shelter_id, petinfo.pet_name, petinfo.pet_age, petinfo.pet_sex, petinfo.pet_descriptions, petinfo.status, petinfo.created_at, petinfo.pet_type, petmedia.pet_image1").
-// 		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
-// 		Where("petinfo.shelter_id = ?", shelterID).
-// 		Scan(&petInfo)
-
-// 	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) || len(petInfo) == 0 {
-// 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-// 			"message": "No pets found for the specified shelter ID",
-// 		})
-// 	} else if infoResult.Error != nil {
-// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-// 			"message": "Database error",
-// 			"error":   infoResult.Error.Error(),
-// 		})
-// 	}
-
-// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-// 		"message": "Pets retrieved successfully",
-// 		"data":    petInfo,
-// 	})
-// }
-
 func GetShelterWithPetsByID(c *fiber.Ctx) error {
-	// Retrieve the shelter ID from the URL parameter
 	shelterID := c.Params("id")
 	if shelterID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Shelter ID parameter is missing",
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "404",
+			Message: "Shelter ID is missing",
 		})
 	}
 
-	// Fetch shelter information by shelter ID
-	var shelterInfo struct {
-		models.ShelterInfo
-		ShelterCover   *string `json:"shelter_cover"`
-		ShelterProfile *string `json:"shelter_profile"`
-	}
-	if err := middleware.DBConn.Table("shelterinfo").
-		Select("shelterinfo.*, sheltermedia.shelter_cover, sheltermedia.shelter_profile").
-		Joins("LEFT JOIN sheltermedia ON shelterinfo.shelter_id = sheltermedia.shelter_id").
-		Where("shelterinfo.shelter_id = ?", shelterID).
-		Scan(&shelterInfo).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"message": "Shelter not found",
-			})
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Database error while fetching shelter info",
-			"error":   err.Error(),
+	var shelterInfo models.ShelterInfo
+	ShelterResult := middleware.DBConn.Debug().Preload("ShelterMedia").Where("shelter_id = ?", shelterID).First(&shelterInfo)
+	if errors.Is(ShelterResult.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "404",
+			Message: "Shelter not found",
+			Data:    nil,
+		})
+	} else if ShelterResult.Error != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Database error",
+			Data:    nil,
 		})
 	}
 
-	// Fetch pets under the shelter by shelter ID
-	var pets []struct {
-		models.PetInfo
-		PetImage1 *string `json:"pet_image1"`
-	}
-	if err := middleware.DBConn.Table("petinfo").
-		Select("petinfo.*, petmedia.pet_image1").
-		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
-		Where("petinfo.shelter_id = ?", shelterID).
-		Scan(&pets).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Database error while fetching pets",
-			"error":   err.Error(),
+	var petInfo []models.PetInfo
+	PetResult := middleware.DBConn.Debug().Preload("PetMedia").Where("shelter_id = ? AND status = ?", shelterID, "available").Find(&petInfo)
+	if errors.Is(PetResult.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "404",
+			Message: "Pets not found",
+			Data:    nil,
+		})
+	} else if PetResult.Error != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Database error",
+			Data:    nil,
 		})
 	}
 
-	// Combine shelter info and pets into a single response
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Shelter and pets retrieved successfully",
 		"data": fiber.Map{
 			"shelter": shelterInfo,
-			"pets":    pets,
+			"pets":    petInfo,
 		},
+	})
+}
+
+func CreateAdoption(c *fiber.Ctx) error {
+	shelterIDStr := c.Params("shelter_id")
+	petIDStr := c.Params("pet_id")
+	adopterIDStr := c.Params("adopter_id")
+
+	adopterID, err := strconv.ParseUint(adopterIDStr, 10, 64)
+	if err != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "400",
+			Message: "Invalid Adopter ID",
+			Data:    nil,
+		})
+	}
+
+	shelterID, err := strconv.ParseUint(shelterIDStr, 10, 64)
+	if err != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "400",
+			Message: "Invalid Shelter ID",
+			Data:    nil,
+		})
+	}
+
+	petID, err := strconv.ParseUint(petIDStr, 10, 64)
+	if err != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "400",
+			Message: "Invalid Pet ID",
+			Data:    nil,
+		})
+	}
+
+	// Read image files
+	validIDFile, err := c.FormFile("adopter_valid_id")
+	if err != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "400",
+			Message: "Valid ID photo is required",
+			Data:    nil,
+		})
+	}
+	altValidIDFile, err := c.FormFile("alt_valid_id")
+	if err != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "400",
+			Message: "Alt Valid ID photo is required",
+			Data:    nil,
+		})
+	}
+
+	// Convert valid_id to base64
+	validIDData, err := validIDFile.Open()
+	if err != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "400",
+			Message: "Valid ID photo is required",
+			Data:    nil,
+		})
+	}
+	defer validIDData.Close()
+
+	validIDBytes, err := ioutil.ReadAll(validIDData)
+	if err != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "400",
+			Message: "Unable to read adopter_valid_id file",
+			Data:    nil,
+		})
+	}
+	validIDBase64 := base64.StdEncoding.EncodeToString(validIDBytes)
+
+	// Convert alt_valid_id to base64
+	altValidIDData, err := altValidIDFile.Open()
+	if err != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "400",
+			Message: "Unable to open alt_valid_id file",
+			Data:    nil,
+		})
+	}
+	defer altValidIDData.Close()
+
+	altValidIDBytes, err := ioutil.ReadAll(altValidIDData)
+	if err != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "400",
+			Message: "Unable to read alt_valid_id file",
+			Data:    nil,
+		})
+	}
+	altValidIDBase64 := base64.StdEncoding.EncodeToString(altValidIDBytes)
+
+	// Create ValidIDPhotos first
+	validIDs := models.ValidIDPhotos{
+		AdopterIDType:  c.FormValue("adopter_id_type"),
+		AdopterValidID: validIDBase64,
+		AltIDType:      c.FormValue("alt_id_type"),
+		AltValidID:     altValidIDBase64,
+	}
+
+	// Insert ValidIDPhotos first to generate valid_id
+	if err := middleware.DBConn.Debug().Create(&validIDs).Error; err != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Failed to save valid IDs",
+			Data:    err.Error(),
+		})
+	}
+
+	// Now create the AdoptionSubmission, setting the valid_id field
+	adoption := models.AdoptionSubmission{
+		ShelterID:           uint(shelterID),
+		PetID:               uint(petID),
+		AdopterID:           uint(adopterID),
+		AltFName:            c.FormValue("alt_f_name"),
+		AltLName:            c.FormValue("alt_l_name"),
+		Relationship:        c.FormValue("relationship"),
+		AltContactNumber:    c.FormValue("alt_contact_number"),
+		AltEmail:            c.FormValue("alt_email"),
+		PetType:             c.FormValue("pet_type"),
+		ShelterAnimal:       c.FormValue("shelter_animal"),
+		IdealPetDescription: c.FormValue("ideal_pet_description"),
+		HousingSituation:    c.FormValue("housing_situation"),
+		PetsAtHome:          c.FormValue("pets_at_home"),
+		Allergies:           c.FormValue("allergies"),
+		FamilySupport:       c.FormValue("family_support"),
+		PastPets:            c.FormValue("past_pets"),
+		InterviewSetting:    c.FormValue("interview_setting"),
+		Status:              "pending",
+		CreatedAt:           time.Now(),
+		ValidID:             validIDs.ValidID, // Set the valid_id field here
+	}
+
+	// Save AdoptionSubmission with valid_id set
+	if err := middleware.DBConn.Debug().Create(&adoption).Error; err != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Failed to save submission",
+			Data:    err.Error(),
+		})
+	}
+
+	// Reload adoption submission with related Adopter and Pet info
+	if err := middleware.DBConn.Debug().
+		Preload("ValidIDs").
+		Preload("Adopter").
+		Preload("Pet").
+		First(&adoption, adoption.ApplicationID).Error; err != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Failed to load related data",
+			Data:    err.Error(),
+		})
+	}
+
+	var petstatus models.PetInfo
+	statusresult := middleware.DBConn.Debug().First(&petstatus, petID)
+	if statusresult.Error != nil {
+		if errors.Is(statusresult.Error, gorm.ErrRecordNotFound){
+			return c.JSON(response.AdopterResponseModel{
+				RetCode: "404",
+				Message: "Pet not found",
+				Data: nil,
+			})
+		}
+
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Database error",
+			Data:  nil,
+		})
+	}
+
+	if petstatus.Status == "pending"{
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "400",
+			Message: "Pet is not available already",
+			Data: nil,
+		})
+	}
+
+	petstatus.Status = "pending"
+	updateResult := middleware.DBConn.Save(&petstatus)
+
+	if updateResult.Error != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Database error",
+			Data: updateResult.Error,
+		})
+	}
+
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message":  "Adoption submission created successfully",
+		"adoption": adoption,
 	})
 }
