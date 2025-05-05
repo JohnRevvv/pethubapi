@@ -38,6 +38,10 @@ func AppRoutes(app *fiber.App) {
 	app.Get("/users/petinfo", controllers.GetAllPets)
 	app.Get("/users/pets/:id", controllers.GetPetByID)
 	app.Get("/user/:id/pet", controllers.GetShelterWithPetsByID)
+	app.Post("/users/status/:id", controllers.UpdatePetStatusToPending)
+	app.Get("/users/priority/", controllers.GetPetsWithTrueStatus)
+	app.Get("/users/allpets", controllers.GetAllPets)
+	app.Get("/users/pets/search/all", controllers.FetchAllPets)
 
 	// ---------------- Shelter Routes ----------------
 	app.Post("/shelter/register", controllers.RegisterShelter)
