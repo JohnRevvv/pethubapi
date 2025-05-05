@@ -1,36 +1,24 @@
 package controllers
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"pethub_api/middleware"
 	"pethub_api/models"
-	"strconv"
+	"pethub_api/models/response"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
 
-type PetInfo struct {
-	PetID          uint      `json:"pet_id"`
-	ShelterID      uint      `json:"shelter_id"`
-	PetName        string    `json:"pet_name"`
-	PetAge         uint      `json:"pet_age"`
-	PetSex         string    `json:"pet_sex"`
-	PetDescription string    `json:"pet_descriptions"`
-	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"created_at"`
-	PetType        *string   `json:"pet_type"` // Nullable column
-	PetSize        string    `json:"pet_size"`
-	PriorityStatus bool      `json:"priority_status"`
-}
-
+// GetAllPets retrieves all pet records from the petinfo table
 // GetAllPets retrieves all pet records from the petinfo table
 func GetAllPets(c *fiber.Ctx) error {
 	// Define a struct to include pet info and the pet_image1 field
 	type PetWithImage struct {
-		PetInfo
+		models.PetInfo
 		PetImage1 string `json:"pet_image1"`
 	}
 
@@ -41,6 +29,7 @@ func GetAllPets(c *fiber.Ctx) error {
 	result := middleware.DBConn.Table("petinfo").
 		Select("petinfo.*, petmedia.pet_image1").
 		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
+		Where("petinfo.status =?", "available").
 		Find(&pets)
 
 	// Handle errors
@@ -54,56 +43,94 @@ func GetAllPets(c *fiber.Ctx) error {
 	return c.JSON(pets)
 }
 
-func GetPetByID(c *fiber.Ctx) error {
-	// Retrieve and sanitize the petID parameter
-	petIDParam := c.Params("id")
-	petID, err := strconv.Atoi(petIDParam) // Convert to integer
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Invalid pet ID format",
-			"error":   err.Error(),
+func GetAvailablePets(c *fiber.Ctx) error {
+	// Define a struct to hold the combined data
+
+	// Create a slice to store the combined data
+	var pets []models.PetInfo
+
+	// Fetch all pets with status "available" and their images from the database
+	result := middleware.DBConn.Table("petinfo").
+		Select("petinfo.*, petmedia.pet_image1").
+		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
+		Where("petinfo.status = ?", "available").
+		Find(&pets)
+
+	// Handle errors
+	if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error retrieving available pets",
 		})
 	}
 
-	// Define a struct to include pet info and the pet_image1 field
-	var petInfo struct {
-		PetID          uint      `json:"pet_id"`
-		ShelterID      uint      `json:"shelter_id"`
-		PetName        string    `json:"pet_name"`
-		PetAge         uint      `json:"pet_age"`
-		PetSex         string    `json:"pet_sex"`
-		PetDescription string    `json:"pet_descriptions"`
-		Status         string    `json:"status"`
-		CreatedAt      time.Time `json:"created_at"`
-		PetType        *string   `json:"pet_type"`
-		PetSize        string    `json:"pet_size"`
-		PriorityStatus bool      `json:"priority_status"`
-		PetImage1      *string   `json:"pet_image1"`
+	// Return the list of available pets with their images
+	return c.JSON(pets)
+}
+
+func GetPetsWithTrueStatus(c *fiber.Ctx) error {
+	// Define a struct to hold the pet data
+
+	// Create a slice to store the pets with true status
+	var pets []models.PetInfo
+
+	// Fetch pets with status "true" from the database
+	result := middleware.DBConn.Preload("PetMedia").
+		Select("petinfo.*, petmedia.pet_image1").
+		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
+		Where("petinfo.priority_status = ?", "true").
+		Find(&pets)
+
+	// Handle errors
+	if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error retrieving pets with true status",
+		})
 	}
 
-	// Fetch pet info and its image from the database
-	infoResult := middleware.DBConn.Table("petinfo").
+	// Return the list of pets with true status
+	return c.JSON(pets)
+}
+
+func GetPetByID(c *fiber.Ctx) error {
+	petID := c.Params("id")
+
+	// Define a struct to hold the combined data
+	type PetWithMedia struct {
+		PetID           uint      `json:"pet_id"`
+		ShelterID       uint      `json:"shelter_id"`
+		PetName         string    `json:"pet_name"`
+		PetAge          uint      `json:"pet_age"`
+		PetSex          string    `json:"pet_sex"`
+		PetDescriptions string    `json:"pet_descriptions"`
+		Status          string    `json:"status"`
+		CreatedAt       time.Time `json:"created_at"`
+		PetType         *string   `json:"pet_type"`
+		PetImage1       *string   `json:"pet_image1"` // Nullable column for pet image
+	}
+
+	// Fetch pet info with its image by ID
+	var pet PetWithMedia
+	result := middleware.DBConn.Table("petinfo").
 		Select("petinfo.*, petmedia.pet_image1").
 		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
 		Where("petinfo.pet_id = ?", petID).
-		Scan(&petInfo)
+		First(&pet)
 
 	// Handle errors
-	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"message": "Pet info not found",
 		})
-	} else if infoResult.Error != nil {
+	} else if result.Error != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Database error",
-			"error":   infoResult.Error.Error(),
 		})
 	}
 
 	// Return the pet info with its image
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Pet info retrieved successfully",
-		"data":    petInfo,
+		"data":    pet,
 	})
 }
 
@@ -141,7 +168,6 @@ func GetAllSheltersByID(c *fiber.Ctx) error {
 		},
 	})
 }
-
 func GetShelter(c *fiber.Ctx) error {
 	// Define a struct to include shelter info and the shelter_profile field
 	type ShelterWithMedia struct {
@@ -171,6 +197,24 @@ func GetShelter(c *fiber.Ctx) error {
 		"message": "Shelters retrieved successfully",
 		"data":    shelters,
 	})
+}
+
+func GetSheltertry(c *fiber.Ctx) error {
+	// Create a slice to store all shelter
+	var shelter []models.ShelterInfo
+
+	// Fetch all shelter from the database
+	result := middleware.DBConn.Table("shelterinfo").Find(&shelter)
+
+	// Handle errors
+	if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error retrieving pets",
+		})
+	}
+
+	// Return the list of pets
+	return c.JSON(shelter)
 }
 
 type AdoptionRequest struct {
@@ -262,3 +306,202 @@ func SubmitAdoptionRequest(c *fiber.Ctx) error {
 
 // GetAdopterInfoByID retrieves adopter info and media by ID
 // for User
+
+func UpdatePetStatusToPending(c *fiber.Ctx) error {
+	petID := c.Params("id")
+
+	// Update the status of the pet to "pending"
+	result := middleware.DBConn.Table("petinfo").
+		Where("pet_id = ?", petID).
+		Update("status", "pending")
+
+	// Handle errors
+	if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to update pet status",
+			"error":   result.Error.Error(),
+		})
+	}
+
+	// Check if any rows were affected
+	if result.RowsAffected == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "Pet not found",
+		})
+	}
+
+	// Success response
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Pet status updated to pending successfully",
+	})
+}
+
+func FetchAndSearchAllPetsforAdopter(c *fiber.Ctx) error {
+	// Get filters from query parameters
+	shelterID := c.Params("id")
+	petName := c.Query("pet_name")
+	petSex := c.Query("sex")
+	petType := c.Query("type")
+	prioritystatus := c.Query("priority_status")
+
+	var pets []models.PetInfo
+
+	query := middleware.DBConn.Where("status = ? AND shelter_id = ?", "available", shelterID)
+
+	// if shelterID != "" {
+	// 	query = query.Where("shelter_id = ?", shelterID)
+	// }
+	if petName != "" {
+		query = query.Where("pet_name ILIKE ?", "%"+petName+"%")
+	}
+	if petSex != "" {
+		query = query.Where("pet_sex = ?", petSex)
+	}
+	if petType != "" {
+		query = query.Where("pet_type = ?", petType)
+	}
+	if prioritystatus != "" {
+		query = query.Where("priority_status = ?", prioritystatus)
+	}
+
+	result := query.Order("priority_status DESC").Order("created_at DESC").Find(&pets)
+	if result.Error != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error while searching pets",
+			Data:    result.Error,
+		})
+	}
+
+	if len(pets) == 0 {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "404",
+			Message: "No pets found",
+			Data:    nil,
+		})
+	}
+
+	// Pet media logic
+	petMediaMap := make(map[uint][]string)
+	var petMedia []models.PetMedia
+	petmediaResult := middleware.DBConn.Where("pet_id IN ?", getPetIDs(pets)).Find(&petMedia)
+	if petmediaResult.Error != nil && !errors.Is(petmediaResult.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error while fetching pet media",
+			Data:    petmediaResult.Error,
+		})
+	}
+
+	for _, media := range petMedia {
+		if media.PetImage1 != "" {
+			if _, err := base64.StdEncoding.DecodeString(media.PetImage1); err == nil {
+				petMediaMap[media.PetID] = append(petMediaMap[media.PetID], media.PetImage1)
+			}
+		}
+	}
+
+	var petResponses []PetResponse
+	for _, pet := range pets {
+		petResponses = append(petResponses, PetResponse{
+			PetID:          pet.PetID,
+			PetType:        pet.PetType,
+			PetName:        pet.PetName,
+			PetSex:         pet.PetSex,
+			PriorityStatus: pet.PriorityStatus,
+			ShelterID:      pet.ShelterID,
+			PetImages:      petMediaMap[pet.PetID],
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Pet search results",
+		"data": fiber.Map{
+			"pets": petResponses,
+		},
+	})
+}
+
+func FetchAllPets(c *fiber.Ctx) error {
+	// Get filters from query parameters
+	petName := c.Query("pet_name")
+	petSex := c.Query("sex")
+	petType := c.Query("type")
+	prioritystatus := c.Query("priority_status")
+
+	var pets []models.PetInfo
+
+	// Start building the query without filtering by shelter_id
+	query := middleware.DBConn.Where("status = ?", "available")
+
+	if petName != "" {
+		query = query.Where("pet_name ILIKE ?", "%"+petName+"%")
+	}
+	if petSex != "" {
+		query = query.Where("pet_sex = ?", petSex)
+	}
+	if petType != "" {
+		query = query.Where("pet_type = ?", petType)
+	}
+	if prioritystatus != "" {
+		query = query.Where("priority_status = ?", prioritystatus)
+	}
+
+	// Execute the query
+	result := query.Order("priority_status DESC").Order("created_at DESC").Find(&pets)
+	if result.Error != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error while fetching pets",
+			Data:    result.Error,
+		})
+	}
+
+	if len(pets) == 0 {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "404",
+			Message: "No pets found",
+			Data:    nil,
+		})
+	}
+
+	// Pet media logic
+	petMediaMap := make(map[uint][]string)
+	var petMedia []models.PetMedia
+	petmediaResult := middleware.DBConn.Where("pet_id IN ?", getPetIDs(pets)).Find(&petMedia)
+	if petmediaResult.Error != nil && !errors.Is(petmediaResult.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error while fetching pet media",
+			Data:    petmediaResult.Error,
+		})
+	}
+
+	for _, media := range petMedia {
+		if media.PetImage1 != "" {
+			if _, err := base64.StdEncoding.DecodeString(media.PetImage1); err == nil {
+				petMediaMap[media.PetID] = append(petMediaMap[media.PetID], media.PetImage1)
+			}
+		}
+	}
+
+	var petResponses []PetResponse
+	for _, pet := range pets {
+		petResponses = append(petResponses, PetResponse{
+			PetID:          pet.PetID,
+			PetType:        pet.PetType,
+			PetName:        pet.PetName,
+			PetSex:         pet.PetSex,
+			PriorityStatus: pet.PriorityStatus,
+			ShelterID:      pet.ShelterID,
+			PetImages:      petMediaMap[pet.PetID],
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "All pets retrieved successfully",
+		"data": fiber.Map{
+			"pets": petResponses,
+		},
+	})
+}
