@@ -39,7 +39,6 @@ func GenerateToken(adopterID uint) (string, error) {
 	return token.SignedString(getJWTSecret()) // Lazy-load here
 }
 
-// ValidateToken validates a JWT token and returns the claims
 func ValidateToken(tokenString string) (*JWTClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -58,7 +57,6 @@ func ValidateToken(tokenString string) (*JWTClaims, error) {
 	return nil, fmt.Errorf("invalid token")
 }
 
-// ValidateJWTMiddleware is a Fiber middleware that validates the JWT token
 func ValidateJWTMiddleware(c *fiber.Ctx) error {
 	authHeader := c.Get("Authorization")
 	if authHeader == "" {
