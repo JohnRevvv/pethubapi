@@ -4,7 +4,7 @@ import (
 	"pethub_api/middleware"
 	"pethub_api/models"
 
-	"pethub_api/models/response"
+	//"pethub_api/models/response"
 	"strconv"
 	"strings"
 
@@ -404,120 +404,120 @@ func UpdateReportStatus(c *fiber.Ctx) error {
 //			"data":    combined,
 //		})
 //	}
-func GetAllShelters(c *fiber.Ctx) error {
-	var accounts []models.ShelterAccount
-	if err := middleware.DBConn.Find(&accounts).Error; err != nil {
-		return c.JSON(response.ShelterResponseModel{
-			RetCode: "400",
-			Message: "Failed to fetch shelter accounts",
-			Data:    nil,
-		})
-	}
+// func GetAllShelters(c *fiber.Ctx) error {
+// 	var accounts []models.ShelterAccount
+// 	if err := middleware.DBConn.Find(&accounts).Error; err != nil {
+// 		return c.JSON(response.ShelterResponseModel{
+// 			RetCode: "400",
+// 			Message: "Failed to fetch shelter accounts",
+// 			Data:    nil,
+// 		})
+// 	}
 
-	var infos []models.ShelterInfo
-	if err := middleware.DBConn.Find(&infos).Error; err != nil {
-		return c.JSON(response.ShelterResponseModel{
-			RetCode: "400",
-			Message: "Failed to fetch shelter info",
-			Data:    nil,
-		})
-	}
+// 	var infos []models.ShelterInfo
+// 	if err := middleware.DBConn.Find(&infos).Error; err != nil {
+// 		return c.JSON(response.ShelterResponseModel{
+// 			RetCode: "400",
+// 			Message: "Failed to fetch shelter info",
+// 			Data:    nil,
+// 		})
+// 	}
 
-	// Create a map of ShelterID to ShelterInfo for faster lookup
-	infoMap := make(map[uint]models.ShelterInfo)
-	for _, info := range infos {
-		infoMap[info.ShelterID] = info
-	}
+// 	// Create a map of ShelterID to ShelterInfo for faster lookup
+// 	infoMap := make(map[uint]models.ShelterInfo)
+// 	for _, info := range infos {
+// 		infoMap[info.ShelterID] = info
+// 	}
 
-	// Combine data
-	shelters := []fiber.Map{}
-	for _, account := range accounts {
-		if info, ok := infoMap[account.ShelterID]; ok {
-			shelters = append(shelters, fiber.Map{
-				"shelter": account,
-				"info":    info,
-			})
-		}
-	}
+// 	// Combine data
+// 	shelters := []fiber.Map{}
+// 	for _, account := range accounts {
+// 		if info, ok := infoMap[account.ShelterID]; ok {
+// 			shelters = append(shelters, fiber.Map{
+// 				"shelter": account,
+// 				"info":    info,
+// 			})
+// 		}
+// 	}
 
-	return c.JSON(response.ShelterResponseModel{
-		RetCode: "200",
-		Message: "All shelters retrieved successfully",
-		Data:    shelters,
-	})
-}
+// 	return c.JSON(response.ShelterResponseModel{
+// 		RetCode: "200",
+// 		Message: "All shelters retrieved successfully",
+// 		Data:    shelters,
+// 	})
+// }
 
-//try
+// //try
 
-func GetAllSheltersAdmintry(c *fiber.Ctx) error {
-	var accounts []models.ShelterAccount
-	if err := middleware.DBConn.Find(&accounts).Error; err != nil {
-		return c.JSON(response.ShelterResponseModel{
-			RetCode: "400",
-			Message: "Failed to fetch shelter accounts",
-			Data:    nil,
-		})
-	}
+// func GetAllSheltersAdmintry(c *fiber.Ctx) error {
+// 	var accounts []models.ShelterAccount
+// 	if err := middleware.DBConn.Find(&accounts).Error; err != nil {
+// 		return c.JSON(response.ShelterResponseModel{
+// 			RetCode: "400",
+// 			Message: "Failed to fetch shelter accounts",
+// 			Data:    nil,
+// 		})
+// 	}
 
-	var infos []models.ShelterInfo
-	if err := middleware.DBConn.Find(&infos).Error; err != nil {
-		return c.JSON(response.ShelterResponseModel{
-			RetCode: "400",
-			Message: "Failed to fetch shelter info",
-			Data:    nil,
-		})
-	}
+// 	var infos []models.ShelterInfo
+// 	if err := middleware.DBConn.Find(&infos).Error; err != nil {
+// 		return c.JSON(response.ShelterResponseModel{
+// 			RetCode: "400",
+// 			Message: "Failed to fetch shelter info",
+// 			Data:    nil,
+// 		})
+// 	}
 
-	// Create a map of ShelterID to ShelterInfo for faster lookup
-	infoMap := make(map[uint]models.ShelterInfo)
-	for _, info := range infos {
-		infoMap[info.ShelterID] = info
-	}
+// 	// Create a map of ShelterID to ShelterInfo for faster lookup
+// 	infoMap := make(map[uint]models.ShelterInfo)
+// 	for _, info := range infos {
+// 		infoMap[info.ShelterID] = info
+// 	}
 
-	// Combine data
-	var combined []fiber.Map
-	for _, account := range accounts {
-		if info, ok := infoMap[account.ShelterID]; ok {
-			combined = append(combined, fiber.Map{
-				"shelter":    account,
-				"info":       info,
-				"reg_status": account.RegStatus, // Include reg_status from ShelterAccount
-			})
-		}
-	}
+// 	// Combine data
+// 	var combined []fiber.Map
+// 	for _, account := range accounts {
+// 		if info, ok := infoMap[account.ShelterID]; ok {
+// 			combined = append(combined, fiber.Map{
+// 				"shelter":    account,
+// 				"info":       info,
+// 				"reg_status": account.RegStatus, // Include reg_status from ShelterAccount
+// 			})
+// 		}
+// 	}
 
-	return c.JSON(response.ShelterResponseModel{
-		RetCode: "200",
-		Message: "All shelters retrieved successfully",
-		Data:    combined,
-	})
-}
+// 	return c.JSON(response.ShelterResponseModel{
+// 		RetCode: "200",
+// 		Message: "All shelters retrieved successfully",
+// 		Data:    combined,
+// 	})
+// }
 
-func ApproveShelterRegStatus(c *fiber.Ctx) error {
-	// Get shelter_id from the URL
-	shelterID := c.Params("id")
+// func ApproveShelterRegStatus(c *fiber.Ctx) error {
+// 	// Get shelter_id from the URL
+// 	shelterID := c.Params("id")
 
-	// Update the shelter's reg_status to "approved" only if it is currently "pending"
-	result := middleware.DBConn.Model(&models.ShelterAccount{}).
-		Where("shelter_id = ? AND reg_status = ?", shelterID, "pending").
-		Update("reg_status", "approved")
+// 	// Update the shelter's reg_status to "approved" only if it is currently "pending"
+// 	result := middleware.DBConn.Model(&models.ShelterAccount{}).
+// 		Where("shelter_id = ? AND reg_status = ?", shelterID, "pending").
+// 		Update("reg_status", "approved")
 
-	// Check for errors
-	if result.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to approve shelter registration",
-			"error":   result.Error.Error(),
-		})
-	}
+// 	// Check for errors
+// 	if result.Error != nil {
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"message": "Failed to approve shelter registration",
+// 			"error":   result.Error.Error(),
+// 		})
+// 	}
 
-	// Check if any rows were affected (i.e., if the shelter was found and updated)
-	if result.RowsAffected == 0 {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"message": "Shelter not found or already approved",
-		})
-	}
+// 	// Check if any rows were affected (i.e., if the shelter was found and updated)
+// 	if result.RowsAffected == 0 {
+// 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+// 			"message": "Shelter not found or already approved",
+// 		})
+// 	}
 
-	return c.JSON(fiber.Map{
-		"message": "Shelter registration approved successfully",
-	})
-}
+// 	return c.JSON(fiber.Map{
+// 		"message": "Shelter registration approved successfully",
+// 	})
+// }

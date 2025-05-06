@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"mime/multipart"
 	"strconv"
+	"strings"
 	"time"
 
 	"pethub_api/middleware"
@@ -454,201 +456,192 @@ func GetShelterWithPetsByID(c *fiber.Ctx) error {
 	})
 }
 
-func CreateAdoption(c *fiber.Ctx) error {
-	shelterIDStr := c.Params("shelter_id")
+func CreateAdoptionSubmission(c *fiber.Ctx) error {
 	petIDStr := c.Params("pet_id")
-	adopterIDStr := c.Params("adopter_id")
-
-	adopterID, err := strconv.ParseUint(adopterIDStr, 10, 64)
-	if err != nil {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "400",
-			Message: "Invalid Adopter ID",
-			Data:    nil,
-		})
+	petID, err := strconv.Atoi(petIDStr)
+	if err != nil || petID == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid or missing petID"})
 	}
 
-	shelterID, err := strconv.ParseUint(shelterIDStr, 10, 64)
-	if err != nil {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "400",
-			Message: "Invalid Shelter ID",
-			Data:    nil,
-		})
+	var pet models.PetInfo
+	if err := middleware.DBConn.Where("pet_id = ?", petID).First(&pet).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Pet not found"})
 	}
 
-	petID, err := strconv.ParseUint(petIDStr, 10, 64)
-	if err != nil {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "400",
-			Message: "Invalid Pet ID",
-			Data:    nil,
-		})
+	adopterID, err := middleware.GetAdopterIDFromJWT(c)
+	if err != nil || adopterID == 0 {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized or invalid token"})
 	}
 
-	// Read image files
-	validIDFile, err := c.FormFile("adopter_valid_id")
-	if err != nil {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "400",
-			Message: "Valid ID photo is required",
-			Data:    nil,
-		})
-	}
-	altValidIDFile, err := c.FormFile("alt_valid_id")
-	if err != nil {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "400",
-			Message: "Alt Valid ID photo is required",
-			Data:    nil,
-		})
+	// Form fields
+	altFName := c.FormValue("altFName")
+	altLName := c.FormValue("altLName")
+	relationship := c.FormValue("relationship")
+	altContactNumber := c.FormValue("altContactNumber")
+	altEmail := c.FormValue("altEmail")
+	altValidID := c.FormValue("altValidID")
+	validID := c.FormValue("validID")
+	reasonForAdoption := c.FormValue("reasonForAdoption")
+	idealPetDescription := c.FormValue("idealPetDescription")
+	housingSituation := c.FormValue("housingSituation")
+	petsAtHome := c.FormValue("petsAtHome")
+	allergies := c.FormValue("allergies")
+	familySupport := c.FormValue("familySupport")
+	pastPets := c.FormValue("pastPets")
+	interviewSetting := c.FormValue("interviewSetting")
+
+	if altFName == "" || altLName == "" || relationship == "" || altContactNumber == "" || altEmail == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Alternate contact fields are required."})
 	}
 
-	// Convert valid_id to base64
-	validIDData, err := validIDFile.Open()
-	if err != nil {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "400",
-			Message: "Valid ID photo is required",
-			Data:    nil,
-		})
-	}
-	defer validIDData.Close()
-
-	validIDBytes, err := ioutil.ReadAll(validIDData)
-	if err != nil {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "400",
-			Message: "Unable to read adopter_valid_id file",
-			Data:    nil,
-		})
-	}
-	validIDBase64 := base64.StdEncoding.EncodeToString(validIDBytes)
-
-	// Convert alt_valid_id to base64
-	altValidIDData, err := altValidIDFile.Open()
-	if err != nil {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "400",
-			Message: "Unable to open alt_valid_id file",
-			Data:    nil,
-		})
-	}
-	defer altValidIDData.Close()
-
-	altValidIDBytes, err := ioutil.ReadAll(altValidIDData)
-	if err != nil {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "400",
-			Message: "Unable to read alt_valid_id file",
-			Data:    nil,
-		})
-	}
-	altValidIDBase64 := base64.StdEncoding.EncodeToString(altValidIDBytes)
-
-	// Create ValidIDPhotos first
-	validIDs := models.ValidIDPhotos{
-		AdopterIDType:  c.FormValue("adopter_id_type"),
-		AdopterValidID: validIDBase64,
-		AltIDType:      c.FormValue("alt_id_type"),
-		AltValidID:     altValidIDBase64,
+	if reasonForAdoption == "" || idealPetDescription == "" || housingSituation == "" || petsAtHome == "" || allergies == "" || familySupport == "" || pastPets == "" || interviewSetting == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Please complete all required questionnaire fields."})
 	}
 
-	// Insert ValidIDPhotos first to generate valid_id
-	if err := middleware.DBConn.Debug().Create(&validIDs).Error; err != nil {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "500",
-			Message: "Failed to save valid IDs",
-			Data:    err.Error(),
-		})
+	if len(altContactNumber) < 11 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Contact numbers must be at least 11 digits."})
 	}
-
-	// Now create the AdoptionSubmission, setting the valid_id field
-	adoption := models.AdoptionSubmission{
-		ShelterID:           uint(shelterID),
-		PetID:               uint(petID),
-		AdopterID:           uint(adopterID),
-		AltFName:            c.FormValue("alt_f_name"),
-		AltLName:            c.FormValue("alt_l_name"),
-		Relationship:        c.FormValue("relationship"),
-		AltContactNumber:    c.FormValue("alt_contact_number"),
-		AltEmail:            c.FormValue("alt_email"),
-		PetType:             c.FormValue("pet_type"),
-		ShelterAnimal:       c.FormValue("shelter_animal"),
-		IdealPetDescription: c.FormValue("ideal_pet_description"),
-		HousingSituation:    c.FormValue("housing_situation"),
-		PetsAtHome:          c.FormValue("pets_at_home"),
-		Allergies:           c.FormValue("allergies"),
-		FamilySupport:       c.FormValue("family_support"),
-		PastPets:            c.FormValue("past_pets"),
-		InterviewSetting:    c.FormValue("interview_setting"),
-		Status:              "pending",
-		CreatedAt:           time.Now(),
-		ValidID:             validIDs.ValidID, // Set the valid_id field here
-	}
-
-	// Save AdoptionSubmission with valid_id set
-	if err := middleware.DBConn.Debug().Create(&adoption).Error; err != nil {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "500",
-			Message: "Failed to save submission",
-			Data:    err.Error(),
-		})
-	}
-
-	// Reload adoption submission with related Adopter and Pet info
-	if err := middleware.DBConn.Debug().
-		Preload("ValidIDs").
-		Preload("Adopter").
-		Preload("Pet").
-		First(&adoption, adoption.ApplicationID).Error; err != nil {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "500",
-			Message: "Failed to load related data",
-			Data:    err.Error(),
-		})
-	}
-
-	var petstatus models.PetInfo
-	statusresult := middleware.DBConn.Debug().First(&petstatus, petID)
-	if statusresult.Error != nil {
-		if errors.Is(statusresult.Error, gorm.ErrRecordNotFound){
-			return c.JSON(response.AdopterResponseModel{
-				RetCode: "404",
-				Message: "Pet not found",
-				Data: nil,
-			})
+	for _, ch := range altContactNumber {
+		if ch < '0' || ch > '9' {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Contact number must only contain digits."})
 		}
-
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "500",
-			Message: "Database error",
-			Data:  nil,
-		})
 	}
 
-	if petstatus.Status == "pending"{
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "400",
-			Message: "Pet is not available already",
-			Data: nil,
-		})
+	if !strings.Contains(altEmail, "@") || !strings.Contains(altEmail, ".") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid alternate email format."})
 	}
 
-	petstatus.Status = "pending"
-	updateResult := middleware.DBConn.Save(&petstatus)
-
-	if updateResult.Error != nil {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "500",
-			Message: "Database error",
-			Data: updateResult.Error,
-		})
+	var existingSubmission models.AdoptionSubmission
+	if err := middleware.DBConn.Where("alt_email = ?", altEmail).First(&existingSubmission).Error; err == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Alternate email is already used in a previous submission. Please use a different one."})
 	}
 
+	tx := middleware.DBConn.Begin()
+	if tx == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to begin DB transaction"})
+	}
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message":  "Adoption submission created successfully",
-		"adoption": adoption,
+	submission := models.AdoptionSubmission{
+		AdopterID:           adopterID,
+		PetID:               uint(petID),
+		ShelterID:           pet.ShelterID,
+		AltFName:            altFName,
+		AltLName:            altLName,
+		Relationship:        relationship,
+		AltContactNumber:    altContactNumber,
+		AltEmail:            altEmail,
+		AltValidID:          altValidID,
+		ValidID:             validID,
+		ReasonForAdoption:   reasonForAdoption,
+		IdealPetDescription: idealPetDescription,
+		HousingSituation:    housingSituation,
+		PetsAtHome:          petsAtHome,
+		Allergies:           allergies,
+		FamilySupport:       familySupport,
+		PastPets:            pastPets,
+		InterviewSetting:    interviewSetting,
+	}
+
+	if err := tx.Create(&submission).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save submission"})
+	}
+
+	form, err := c.MultipartForm()
+	if err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to parse form"})
+	}
+
+	var totalHomeUploadSize int64
+	if homeFiles := form.File["homeFiles"]; len(homeFiles) > 0 {
+		for _, file := range homeFiles {
+			totalHomeUploadSize += file.Size
+			if totalHomeUploadSize > 15*1024*1024 {
+				tx.Rollback()
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Total home photo/PDF size exceeds 15MB"})
+			}
+			base64Data, err := encodeFileToBase64(file)
+			if err != nil {
+				tx.Rollback()
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to encode home file"})
+			}
+			photo := models.ApplicationPhoto{
+				ApplicationID: submission.ApplicationID,
+				PhotoType:     "Home Photo or PDF",
+				Base64Data:    base64Data,
+				UploadedAt:    time.Now(),
+			}
+			if err := tx.Create(&photo).Error; err != nil {
+				tx.Rollback()
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save home photo or PDF"})
+			}
+		}
+	}
+
+	if validIDHeader, err := c.FormFile("validIDPhoto"); err == nil {
+		if validIDHeader.Size > 8*1024*1024 {
+			tx.Rollback()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Valid ID file size exceeds 8MB"})
+		}
+		base64Data, err := encodeFileToBase64(validIDHeader)
+		if err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to encode Valid ID photo"})
+		}
+		photo := models.ApplicationPhoto{
+			ApplicationID: submission.ApplicationID,
+			PhotoType:     "Valid ID",
+			Base64Data:    base64Data,
+			UploadedAt:    time.Now(),
+		}
+		if err := tx.Create(&photo).Error; err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save Valid ID photo"})
+		}
+	}
+
+	if altValidIDHeader, err := c.FormFile("altValidIDPhoto"); err == nil {
+		if altValidIDHeader.Size > 8*1024*1024 {
+			tx.Rollback()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Alternate Valid ID file size exceeds 8MB"})
+		}
+		base64Data, err := encodeFileToBase64(altValidIDHeader)
+		if err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to encode Alternate Valid ID photo"})
+		}
+		photo := models.ApplicationPhoto{
+			ApplicationID: submission.ApplicationID,
+			PhotoType:     "Alternate Valid ID",
+			Base64Data:    base64Data,
+			UploadedAt:    time.Now(),
+		}
+		if err := tx.Create(&photo).Error; err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save Alternate Valid ID photo"})
+		}
+	}
+
+	tx.Commit()
+	return c.JSON(fiber.Map{
+		"message":    "Adoption submission successful",
+		"submission": submission,
+		"shelter_id": pet.ShelterID,
 	})
+}
+
+func encodeFileToBase64(fileHeader *multipart.FileHeader) (string, error) {
+	file, err := fileHeader.Open()
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	fileData, err := ioutil.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(fileData), nil
 }

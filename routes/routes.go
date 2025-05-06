@@ -20,8 +20,8 @@ func AppRoutes(app *fiber.App) {
 	app.Post("/admin/updateshelterstatus", controllers.UpdateShelterStatus)
 	app.Post("/admin/updateadopterstatus", controllers.UpdateAdopterStatus)
 	//try
-	app.Get("/admin/getallshelterstry", controllers.GetAllSheltersAdmintry) // Route to get all shelters by id
-	app.Put("/admin/shelters/:id/approve", controllers.ApproveShelterRegStatus)
+	//app.Get("/admin/getallshelterstry", controllers.GetAllSheltersAdmintry) // Route to get all shelters by id
+	//app.Put("/admin/shelters/:id/approve", controllers.ApproveShelterRegStatus)
 
 	// =====================
 	// Public Routes (No Auth Required)
