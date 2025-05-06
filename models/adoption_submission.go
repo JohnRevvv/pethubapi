@@ -37,3 +37,24 @@ type AdoptionSubmission struct {
 func (AdoptionSubmission) TableName() string {
 	return "adoption_submissions"
 }
+
+type ApplicationPhoto struct {
+	ID            uint   `gorm:"primaryKey"`
+	ApplicationID uint   `gorm:"not null"`
+	PhotoType     string `gorm:"not null"` // "Home Photo or PDF"
+	Base64Data    string `gorm:"type:text"`
+	UploadedAt    time.Time
+}
+
+// For structured Valid ID info
+type ValidIDPhotos struct {
+	ValidID        uint   `gorm:"primaryKey;autoIncWrement"`
+	AdopterIDType  string `json:"adopter_id_type"`
+	AdopterValidID string `json:"adopter_valid_id"`
+	AltIDType      string `json:"alt_id_type"`
+	AltValidID     string `json:"alt_valid_id"`
+}
+
+// TableName overrides (both map to the same table)
+func (ApplicationPhoto) TableName() string { return "application_photos" }
+func (ValidIDPhotos) TableName() string    { return "application_photos" }

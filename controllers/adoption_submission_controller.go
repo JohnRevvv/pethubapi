@@ -39,7 +39,6 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 	altEmail := c.FormValue("altEmail")
 	altValidID := c.FormValue("altValidID")
 	validID := c.FormValue("validID")
-
 	reasonForAdoption := c.FormValue("reasonForAdoption")
 	idealPetDescription := c.FormValue("idealPetDescription")
 	housingSituation := c.FormValue("housingSituation")

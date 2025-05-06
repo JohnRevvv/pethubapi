@@ -11,6 +11,7 @@ type ShelterAccount struct {
 	RegStatus string `json:"reg_status"`
 	CreatedAt time.Time
 
+
 	//Info      ShelterInfo `gorm:"foreignKey:ShelterID;constraint:OnDelete:CASCADE" json:"info"`
 }
 
@@ -30,6 +31,8 @@ type ShelterInfo struct {
 	ShelterOwner       string `json:"shelter_owner"`
 	ShelterDescription string `json:"shelter_description"`
 	ShelterSocial      string `json:"shelter_social"`
+
+	ShelterMedia ShelterMedia `gorm:"foreignKey:ShelterID;references:ShelterID" json:"sheltermedia"`
 }
 
 // TableName overrides default table name

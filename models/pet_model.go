@@ -15,6 +15,7 @@ type PetInfo struct {
 	CreatedAt       time.Time `json:"created_at"`
 	PetSize         string    `json:"pet_size"`
 	PriorityStatus  bool      `json:"priority_status"`
+	
 	PetMedia        PetMedia  `gorm:"foreignKey:PetID;references:PetID" json:"petmedia"`
 }
 
