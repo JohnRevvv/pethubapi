@@ -3,11 +3,10 @@ package controllers
 import (
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"pethub_api/middleware"
 	"pethub_api/models"
 	"pethub_api/models/response"
-	"time"
+
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -92,46 +91,32 @@ func GetPetsWithTrueStatus(c *fiber.Ctx) error {
 }
 
 func GetPetByID(c *fiber.Ctx) error {
-	petID := c.Params("id")
+	petID := c.Params("pet_id")
 
-	// Define a struct to hold the combined data
-	type PetWithMedia struct {
-		PetID           uint      `json:"pet_id"`
-		ShelterID       uint      `json:"shelter_id"`
-		PetName         string    `json:"pet_name"`
-		PetAge          uint      `json:"pet_age"`
-		PetSex          string    `json:"pet_sex"`
-		PetDescriptions string    `json:"pet_descriptions"`
-		Status          string    `json:"status"`
-		CreatedAt       time.Time `json:"created_at"`
-		PetType         *string   `json:"pet_type"`
-		PetImage1       *string   `json:"pet_image1"` // Nullable column for pet image
-	}
+	var petInfo models.PetInfo
+	infoResult := middleware.DBConn.Debug().Preload("PetMedia").Where("pet_id = ?", petID).First(&petInfo)
 
-	// Fetch pet info with its image by ID
-	var pet PetWithMedia
-	result := middleware.DBConn.Table("petinfo").
-		Select("petinfo.*, petmedia.pet_image1").
-		Joins("LEFT JOIN petmedia ON petinfo.pet_id = petmedia.pet_id").
-		Where("petinfo.pet_id = ?", petID).
-		First(&pet)
-
-	// Handle errors
-	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"message": "Pet info not found",
+	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "404",
+			Message: "Pet not found",
+			Data:    nil,
 		})
-	} else if result.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Database error",
+	} else if infoResult.Error != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Database error",
+			Data:    infoResult.Error,
 		})
 	}
 
-	// Return the pet info with its image
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Pet info retrieved successfully",
-		"data":    pet,
+		"data": fiber.Map{
+			"pet": petInfo,
+		},
 	})
+
 }
 
 func GetAllSheltersByID(c *fiber.Ctx) error {
@@ -168,7 +153,36 @@ func GetAllSheltersByID(c *fiber.Ctx) error {
 		},
 	})
 }
-func GetShelter(c *fiber.Ctx) error {
+
+func GetAllShelters(c *fiber.Ctx) error {
+	var AllShelters []models.ShelterAccount
+	result := middleware.DBConn.Debug().Preload("ShelterInfo.ShelterMedia").Where("reg_status = ? AND status = ?", "approved", "active").Find(&AllShelters)
+
+	if result.Error != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Database error",
+			Data:    nil,
+		})
+	}
+
+	if len(AllShelters) == 0 {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "404",
+			Message: "No shelters found",
+			Data:    nil,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Shelter search results",
+		"data": fiber.Map{
+			"shelters": AllShelters,
+		},
+	})
+}
+
+func GetShelters(c *fiber.Ctx) error {
 	// Define a struct to include shelter info and the shelter_profile field
 	type ShelterWithMedia struct {
 		models.ShelterInfo
@@ -198,114 +212,6 @@ func GetShelter(c *fiber.Ctx) error {
 		"data":    shelters,
 	})
 }
-
-func GetSheltertry(c *fiber.Ctx) error {
-	// Create a slice to store all shelter
-	var shelter []models.ShelterInfo
-
-	// Fetch all shelter from the database
-	result := middleware.DBConn.Table("shelterinfo").Find(&shelter)
-
-	// Handle errors
-	if result.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Error retrieving pets",
-		})
-	}
-
-	// Return the list of pets
-	return c.JSON(shelter)
-}
-
-type AdoptionRequest struct {
-	FirstName        string `json:"first_name"`
-	LastName         string `json:"last_name"`
-	Address          string `json:"address"`
-	Phone            string `json:"phone"`
-	Email            string `json:"email"`
-	Occupation       string `json:"occupation"`
-	SocialMedia      string `json:"social_media"`
-	CivilStatus      string `json:"civil_status"`
-	Sex              string `json:"sex"`
-	Birthdate        string `json:"birthdate"`
-	HasAdoptedBefore string `json:"has_adopted_before"`
-	IdealPet         string `json:"ideal_pet"`
-	BuildingType     string `json:"building_type"`
-	RentStatus       string `json:"rent_status"`
-	MovePlan         string `json:"move_plan"`
-	LivingWith       string `json:"living_with"`
-	Allergy          string `json:"allergy"`
-	PetCare          string `json:"pet_care"`
-	PetNeeds         string `json:"pet_needs"`
-	VacationPlan     string `json:"vacation_plan"`
-	FamilySupport    string `json:"family_support"`
-	HasOtherPets     string `json:"has_other_pets"`
-	HasPastPets      string `json:"has_past_pets"`
-	PetId            int    `json:"pet_id"`
-
-	// Image uploads
-	FrontOfHouse string `json:"front_of_house"`
-	StreetPhoto  string `json:"street_photo"`
-	LivingRoom   string `json:"living_room"`
-	DiningArea   string `json:"dining_area"`
-	Kitchen      string `json:"kitchen"`
-	Bedroom      string `json:"bedroom"`
-	HouseWindow  string `json:"window"`
-	FrontYard    string `json:"front_yard"`
-	Backyard     string `json:"backyard"`
-}
-
-// SubmitAdoptionRequest handles the adoption request submission
-func SubmitAdoptionRequest(c *fiber.Ctx) error {
-	// Log the raw request body for debugging
-	body := c.Body()
-	fmt.Println("Raw Request Body:", string(body))
-
-	// Initialize the struct
-	var adoptionRequest AdoptionRequest // Use the correct struct from the current package
-
-	// Parse JSON request body
-	if err := c.BodyParser(&adoptionRequest); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Invalid request body",
-			"error":   err.Error(),
-		})
-	}
-
-	// Validate required fields
-	if adoptionRequest.Birthdate == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Birthdate is required.",
-		})
-	}
-
-	// Parse and validate birthdate
-	birthdate, err := time.Parse("2006-01-02", adoptionRequest.Birthdate)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Invalid birthdate format. Use YYYY-MM-DD.",
-			"error":   err.Error(),
-		})
-	}
-	adoptionRequest.Birthdate = birthdate.Format("2006-01-02") // Format the birthdate as a string
-
-	// Save the request to the database
-	result := middleware.DBConn.Table("adoption_requests").Create(&adoptionRequest)
-	if result.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to submit adoption request",
-			"error":   result.Error.Error(),
-		})
-	}
-
-	// Success response
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Adoption request submitted successfully",
-	})
-}
-
-// GetAdopterInfoByID retrieves adopter info and media by ID
-// for User
 
 func UpdatePetStatusToPending(c *fiber.Ctx) error {
 	petID := c.Params("id")

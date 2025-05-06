@@ -44,49 +44,6 @@ func GetShelterInfo(c *fiber.Ctx) error {
 	})
 }
 
-func GetAllShelters(c *fiber.Ctx) error {
-	var accounts []models.ShelterAccount
-	if err := middleware.DBConn.Find(&accounts).Error; err != nil {
-		return c.JSON(response.ShelterResponseModel{
-			RetCode: "400",
-			Message: "Failed to fetch shelter accounts",
-			Data:    nil,
-		})
-	}
-
-	var infos []models.ShelterInfo
-	if err := middleware.DBConn.Find(&infos).Error; err != nil {
-		return c.JSON(response.ShelterResponseModel{
-			RetCode: "400",
-			Message: "Failed to fetch shelter info",
-			Data:    nil,
-		})
-	}
-
-	// Create a map of ShelterID to ShelterInfo for faster lookup
-	infoMap := make(map[uint]models.ShelterInfo)
-	for _, info := range infos {
-		infoMap[info.ShelterID] = info
-	}
-
-	// Combine data
-	shelters := []fiber.Map{}
-	for _, account := range accounts {
-		if info, ok := infoMap[account.ShelterID]; ok {
-			shelters = append(shelters, fiber.Map{
-				"shelter": account,
-				"info":    info,
-			})
-		}
-	}
-
-	return c.JSON(response.ShelterResponseModel{
-		RetCode: "200",
-		Message: "All shelters retrieved successfully",
-		Data:    shelters,
-	})
-}
-
 func RegisterShelter(c *fiber.Ctx) error {
 	// Parse request body
 	requestBody := struct {
@@ -926,7 +883,7 @@ func GetApplicationByApplicationID(c *fiber.Ctx) error {
 	})
 }
 
-func AddPetInfo2(c *fiber.Ctx) error {
+func AddPetInfo(c *fiber.Ctx) error {
 	// Get ShelterID from route
 	shelterIDParam := c.Params("shelter_id")
 	shelterID, err := strconv.ParseUint(shelterIDParam, 10, 32)
@@ -1015,3 +972,50 @@ func AddPetInfo2(c *fiber.Ctx) error {
 	})
 }
 
+func ApproveApplication(c *fiber.Ctx) error {
+	applicationID := c.Params("application_id")
+
+	var application models.AdoptionSubmission
+
+	Result := middleware.DBConn.Debug().Where("application_id = ?", applicationID).First(&application)
+
+	if Result.Error != nil {
+		if errors.Is(Result.Error, gorm.ErrRecordNotFound){
+			return c.JSON(response.ShelterResponseModel{
+				RetCode: "404",
+				Message: "Application not found",
+				Data: nil,
+			})
+		}
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error",
+			Data: Result.Error,
+		})
+	}
+
+	if application.Status == "approved" {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "400",
+			Message: "Pet is already approved",
+			Data: nil,
+		})
+	}
+
+	application.Status = "approved"
+	updateResult := middleware.DBConn.Save(&application)
+
+	if updateResult.Error != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error",
+			Data: updateResult.Error,
+		})
+	}
+
+	return c.JSON(response.ShelterResponseModel{
+		RetCode: "200",
+		Message: "Status updated",
+		Data: application,
+	})
+}
