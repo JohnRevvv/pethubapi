@@ -368,41 +368,42 @@ func UpdateReportStatus(c *fiber.Ctx) error {
 		},
 	})
 }
-func GetAllAdopters(c *fiber.Ctx) error {
-	var accounts []models.AdopterAccount
-	if err := middleware.DBConn.Find(&accounts).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to fetch adopter accounts",
-		})
-	}
 
-	var infos []models.AdopterInfo
-	if err := middleware.DBConn.Find(&infos).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to fetch adopter info",
-		})
-	}
+// func GetAllAdopters(c *fiber.Ctx) error {
+// 	var accounts []models.AdopterAccount
+// 	if err := middleware.DBConn.Find(&accounts).Error; err != nil {
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"message": "Failed to fetch adopter accounts",
+// 		})
+// 	}
 
-	infoMap := make(map[uint]models.AdopterInfo)
-	for _, info := range infos {
-		infoMap[info.AdopterID] = info
-	}
+// 	var infos []models.AdopterInfo
+// 	if err := middleware.DBConn.Find(&infos).Error; err != nil {
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"message": "Failed to fetch adopter info",
+// 		})
+// 	}
 
-	var combined []fiber.Map
-	for _, account := range accounts {
-		if info, ok := infoMap[account.AdopterID]; ok {
-			combined = append(combined, fiber.Map{
-				"adopter": account,
-				"info":    info,
-			})
-		}
-	}
+// 	infoMap := make(map[uint]models.AdopterInfo)
+// 	for _, info := range infos {
+// 		infoMap[info.AdopterID] = info
+// 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Adopters retrieved successfully",
-		"data":    combined,
-	})
-}
+// 	var combined []fiber.Map
+// 	for _, account := range accounts {
+// 		if info, ok := infoMap[account.AdopterID]; ok {
+// 			combined = append(combined, fiber.Map{
+// 				"adopter": account,
+// 				"info":    info,
+// 			})
+// 		}
+// 	}
+
+//		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+//			"message": "Adopters retrieved successfully",
+//			"data":    combined,
+//		})
+//	}
 func GetAllShelters(c *fiber.Ctx) error {
 	var accounts []models.ShelterAccount
 	if err := middleware.DBConn.Find(&accounts).Error; err != nil {

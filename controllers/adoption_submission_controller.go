@@ -21,12 +21,9 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid or missing petID"})
 	}
 
-	// First fetch the pet to get its ShelterID
 	var pet models.PetInfo
 	if err := middleware.DBConn.Where("pet_id = ?", petID).First(&pet).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "Pet not found",
-		})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Pet not found"})
 	}
 
 	adopterID, err := middleware.GetAdopterIDFromJWT(c)
@@ -43,8 +40,7 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 	altValidID := c.FormValue("altValidID")
 	validID := c.FormValue("validID")
 
-	petType := c.FormValue("petType")
-	shelterAnimal := c.FormValue("shelterAnimal")
+	reasonForAdoption := c.FormValue("reasonForAdoption")
 	idealPetDescription := c.FormValue("idealPetDescription")
 	housingSituation := c.FormValue("housingSituation")
 	petsAtHome := c.FormValue("petsAtHome")
@@ -53,46 +49,30 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 	pastPets := c.FormValue("pastPets")
 	interviewSetting := c.FormValue("interviewSetting")
 
-	// Basic input validation
 	if altFName == "" || altLName == "" || relationship == "" || altContactNumber == "" || altEmail == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Alternate contact fields are required.",
-		})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Alternate contact fields are required."})
 	}
 
-	if petType == "" || idealPetDescription == "" || housingSituation == "" || petsAtHome == "" || allergies == "" || familySupport == "" || pastPets == "" || interviewSetting == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Please complete all required questionnaire fields.",
-		})
+	if reasonForAdoption == "" || idealPetDescription == "" || housingSituation == "" || petsAtHome == "" || allergies == "" || familySupport == "" || pastPets == "" || interviewSetting == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Please complete all required questionnaire fields."})
 	}
 
-	// Contact number validation
 	if len(altContactNumber) < 11 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Contact numbers must be at least 11 digits.",
-		})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Contact numbers must be at least 11 digits."})
 	}
 	for _, ch := range altContactNumber {
 		if ch < '0' || ch > '9' {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Contact number must only contain digits.",
-			})
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Contact number must only contain digits."})
 		}
 	}
 
-	// Email format validation (basic)
 	if !strings.Contains(altEmail, "@") || !strings.Contains(altEmail, ".") {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid alternate email format.",
-		})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid alternate email format."})
 	}
 
-	// Duplicate altEmail check (globally unique)
 	var existingSubmission models.AdoptionSubmission
 	if err := middleware.DBConn.Where("alt_email = ?", altEmail).First(&existingSubmission).Error; err == nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Alternate email is already used in a previous submission. Please use a different one.",
-		})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Alternate email is already used in a previous submission. Please use a different one."})
 	}
 
 	tx := middleware.DBConn.Begin()
@@ -103,7 +83,7 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 	submission := models.AdoptionSubmission{
 		AdopterID:           adopterID,
 		PetID:               uint(petID),
-		ShelterID:           pet.ShelterID, // Added ShelterID from pet
+		ShelterID:           pet.ShelterID,
 		AltFName:            altFName,
 		AltLName:            altLName,
 		Relationship:        relationship,
@@ -111,8 +91,7 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 		AltEmail:            altEmail,
 		AltValidID:          altValidID,
 		ValidID:             validID,
-		PetType:             petType,
-		ShelterAnimal:       shelterAnimal,
+		ReasonForAdoption:   reasonForAdoption,
 		IdealPetDescription: idealPetDescription,
 		HousingSituation:    housingSituation,
 		PetsAtHome:          petsAtHome,
@@ -133,7 +112,6 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to parse form"})
 	}
 
-	// General Home Photos or PDF Upload (max total size 15MB)
 	var totalHomeUploadSize int64
 	if homeFiles := form.File["homeFiles"]; len(homeFiles) > 0 {
 		for _, file := range homeFiles {
@@ -142,7 +120,6 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 				tx.Rollback()
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Total home photo/PDF size exceeds 15MB"})
 			}
-
 			base64Data, err := encodeFileToBase64(file)
 			if err != nil {
 				tx.Rollback()
@@ -161,7 +138,6 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 		}
 	}
 
-	// Valid ID photo
 	if validIDHeader, err := c.FormFile("validIDPhoto"); err == nil {
 		if validIDHeader.Size > 8*1024*1024 {
 			tx.Rollback()
@@ -184,7 +160,6 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 		}
 	}
 
-	// Alternate Valid ID photo
 	if altValidIDHeader, err := c.FormFile("altValidIDPhoto"); err == nil {
 		if altValidIDHeader.Size > 8*1024*1024 {
 			tx.Rollback()
@@ -211,7 +186,7 @@ func CreateAdoptionSubmission(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message":    "Adoption submission successful",
 		"submission": submission,
-		"shelter_id": pet.ShelterID, // Optionally include shelter_id in response
+		"shelter_id": pet.ShelterID,
 	})
 }
 
@@ -229,4 +204,3 @@ func encodeFileToBase64(fileHeader *multipart.FileHeader) (string, error) {
 
 	return base64.StdEncoding.EncodeToString(fileData), nil
 }
-

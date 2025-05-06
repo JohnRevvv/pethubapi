@@ -46,7 +46,7 @@ type AdopterMedia struct {
 }
 
 func (AdopterMedia) TableName() string {
-	return "adoptermedia"
+	return "adopter_media"
 }
 
 type AdoptedPet struct {

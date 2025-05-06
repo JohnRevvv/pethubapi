@@ -2,11 +2,14 @@ package routes
 
 import (
 	"pethub_api/controllers"
+	"pethub_api/middleware"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 func AppRoutes(app *fiber.App) {
+
+	pethubRoutes := app.Group("/api", middleware.JWTMiddleware())
 	// ---------------- Admin Routes ----------------
 	app.Post("/admin/register", controllers.RegisterAdmin)
 	app.Post("/admin/login", controllers.LoginAdmin)
@@ -20,21 +23,27 @@ func AppRoutes(app *fiber.App) {
 	app.Get("/admin/getallshelterstry", controllers.GetAllSheltersAdmintry) // Route to get all shelters by id
 	app.Put("/admin/shelters/:id/approve", controllers.ApproveShelterRegStatus)
 
-	// ---------------- Adopter Routes ----------------
+	// =====================
+	// Public Routes (No Auth Required)
 	app.Post("/user/register", controllers.RegisterAdopter)
 	app.Post("/user/login", controllers.LoginAdopter)
-	app.Get("/user", controllers.GetAllAdopters)
-	app.Get("/user/:id", controllers.GetAdopterInfoByID)
-	app.Get("/users/profile/:id", controllers.GetAdopterInfoByID)
-	app.Put("/users/:id/update-info", controllers.UpdateAdopterDetails)
-	app.Post("/users/:id/upload-media", controllers.UploadAdopterMedia)
-	app.Get("/adopter/:id", controllers.GetAdopterProfile)
-	app.Put("/adopter/:id", controllers.EditAdopterProfile)
+	// =====================
+	// Protected Routes Group (Auth Required)// Adopter routes
+	// =====================
+
+	pethubRoutes.Get("/user", controllers.GetAllAdopters)
+	pethubRoutes.Get("/user/:id", controllers.GetAdopterInfoByID)
+	pethubRoutes.Get("/users/profile/:id", controllers.GetAdopterInfoByID)
+	pethubRoutes.Put("/users/:id/update-info", controllers.UpdateAdopterDetails)
+	pethubRoutes.Post("/users/:id/upload-media", controllers.UploadAdopterMedia)
+	pethubRoutes.Get("/adopter/:id", controllers.GetAdopterProfile)
+	pethubRoutes.Put("/adopter/:id", controllers.EditAdopterProfile)
+	pethubRoutes.Post("/submission/:pet_id", controllers.CreateAdoptionSubmission)
 
 	// Adopter - Pet Related
-	app.Get("/users/petinfo", controllers.GetAllPets)
-	app.Get("/users/pets/:id", controllers.GetPetByID)
-	app.Get("/user/:id/pet", controllers.GetShelterWithPetsByID)
+	pethubRoutes.Get("/users/petinfo", controllers.GetAllPets)
+	pethubRoutes.Get("/users/pets/:id", controllers.GetPetByID)
+	pethubRoutes.Get("/user/:id/pet", controllers.GetShelterWithPetsByID)
 
 	// ---------------- Shelter Routes ----------------
 	app.Post("/shelter/register", controllers.RegisterShelter)
@@ -73,5 +82,5 @@ func AppRoutes(app *fiber.App) {
 	app.Post("/adopter/reset-password", controllers.AdopterResetPassword)
 
 	// ---------------- Adoption Application ----------------
-	app.Post("/adoption/application/:adopter_id/:pet_id", controllers.AdoptionApplication)
+	// app.Post("/adoption/application/:adopter_id/:pet_id", controllers.AdoptionApplication)
 }

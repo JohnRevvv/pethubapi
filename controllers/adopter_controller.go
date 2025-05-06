@@ -156,7 +156,7 @@ func LoginAdopter(c *fiber.Ctx) error {
 	}
 
 	// Generate JWT
-	token, err := middleware.GenerateToken(adopterAccount.AdopterID)
+	token, err := middleware.GenerateJWT(adopterAccount.AdopterID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": fmt.Sprintf("Failed to generate token: %v", err),
