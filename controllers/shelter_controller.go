@@ -10,6 +10,7 @@ import (
 	"pethub_api/models"
 	"pethub_api/models/response"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -854,7 +855,7 @@ func GetApplicationByApplicationID(c *fiber.Ctx) error {
 	var adoptionSubmission models.AdoptionSubmission
 	infoResult := middleware.DBConn.Debug().Where("application_id = ?", applicationID).
 		Preload("Adopter").
-		Preload("Adopter.AdopterMedia"). 
+		Preload("Adopter.AdopterMedia").
 		Preload("Pet").
 		Preload("ValidIDs").
 		Preload("Pet.PetMedia").First(&adoptionSubmission)
@@ -866,7 +867,7 @@ func GetApplicationByApplicationID(c *fiber.Ctx) error {
 				Message: "Application not found",
 				Data:    nil,
 			})
-		} else{
+		} else {
 			return c.JSON(response.AdopterResponseModel{
 				RetCode: "500",
 				Message: "Something went wrong",
@@ -972,50 +973,111 @@ func AddPetInfo(c *fiber.Ctx) error {
 	})
 }
 
-func ApproveApplication(c *fiber.Ctx) error {
+func ReviewAdoptionApplication(c *fiber.Ctx) error {
+	// Use application_id instead of submission_id
 	applicationID := c.Params("application_id")
+	action := c.Params("action")
 
-	var application models.AdoptionSubmission
-
-	Result := middleware.DBConn.Debug().Where("application_id = ?", applicationID).First(&application)
-
-	if Result.Error != nil {
-		if errors.Is(Result.Error, gorm.ErrRecordNotFound){
-			return c.JSON(response.ShelterResponseModel{
-				RetCode: "404",
-				Message: "Application not found",
-				Data: nil,
-			})
-		}
-		return c.JSON(response.ShelterResponseModel{
-			RetCode: "500",
-			Message: "Database error",
-			Data: Result.Error,
+	var submission models.AdoptionSubmission
+	if err := middleware.DBConn.First(&submission, applicationID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Adoption submission not found",
 		})
 	}
 
-	if application.Status == "approved" {
-		return c.JSON(response.ShelterResponseModel{
-			RetCode: "400",
-			Message: "Pet is already approved",
-			Data: nil,
+	switch action {
+	case "approve":
+		submission.Status = "Approved"
+	case "disapprove":
+		submission.Status = "Disapproved"
+	default:
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid action",
 		})
 	}
 
-	application.Status = "approved"
-	updateResult := middleware.DBConn.Save(&application)
-
-	if updateResult.Error != nil {
-		return c.JSON(response.ShelterResponseModel{
-			RetCode: "500",
-			Message: "Database error",
-			Data: updateResult.Error,
+	if err := middleware.DBConn.Save(&submission).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update submission status",
 		})
 	}
 
-	return c.JSON(response.ShelterResponseModel{
-		RetCode: "200",
-		Message: "Status updated",
-		Data: application,
+	return c.JSON(fiber.Map{
+		"message": "Application status updated successfully",
+	})
+}
+
+// SetInterviewTime allows the shelter to set the interview time and type (online/face-to-face) for an approved application.
+func SetInterviewTime(c *fiber.Ctx) error {
+	// Get the submission_id from the route params
+	submissionID := c.Params("application_id")
+	var interviewDetails struct {
+		InterviewTime string `json:"interview_time"` // Interview date/time (e.g., "May 12, 2025 at 2:00 PM")
+		Platform      string `json:"platform"`       // Interview platform (e.g., "Face-to-Face at Pethub Shelter Office")
+	}
+
+	// Parse the body to get interview details
+	if err := c.BodyParser(&interviewDetails); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	// Validate the interview setting
+	interviewSetting := interviewDetails.InterviewTime + " via " + interviewDetails.Platform
+
+	// Check if interview setting is empty
+	if interviewSetting == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Interview setting is required.",
+		})
+	}
+
+	// Split the interviewSetting into time and platform
+	parts := strings.Split(interviewSetting, " via ")
+
+	// Ensure there are exactly two parts: time and platform
+	if len(parts) != 2 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Interview setting must include both time and platform, formatted as 'Month Day, Year at HH:MM AM/PM via Platform'.",
+		})
+	}
+
+	// Validate interview time (custom format check: "Month Day, Year at HH:MM AM/PM")
+	interviewTime := parts[0]
+	_, err := time.Parse("January 2, 2006 at 3:04 PM", interviewTime) // Custom format "Month Day, Year at HH:MM AM/PM"
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid interview time format. Please use 'Month Day, Year at HH:MM AM/PM'.",
+		})
+	}
+
+	// Validate the platform (simple check for non-empty string)
+	platform := parts[1]
+	if platform == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Interview platform is required.",
+		})
+	}
+
+	// Find the adoption submission
+	var submission models.AdoptionSubmission
+	if err := middleware.DBConn.First(&submission, submissionID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Adoption submission not found",
+		})
+	}
+
+	// Update the interview setting for the approved submission
+	submission.InterviewSetting = interviewSetting
+	if err := middleware.DBConn.Save(&submission).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update interview details",
+		})
+	}
+
+	// Return the updated interview details
+	return c.JSON(fiber.Map{
+		"message": "Interview time and platform updated successfully",
 	})
 }

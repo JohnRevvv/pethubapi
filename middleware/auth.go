@@ -54,7 +54,7 @@ func JWTMiddleware() fiber.Handler {
 		if len(tokenString) > 7 && tokenString[:7] == "Bearer " {
 			tokenString = tokenString[7:]
 		}
-		
+
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method")
@@ -72,11 +72,30 @@ func JWTMiddleware() fiber.Handler {
 
 		fmt.Println("Token received:", tokenString)
 
-		c.Locals("adopter_id", token.Claims.(jwt.MapClaims)["id"])
+		// Get "id" from claims
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			return c.JSON(response.ResponseModel{
+				RetCode: "401",
+				Message: "Unauthorized: Invalid token claims",
+				Data:    nil,
+			})
+		}
+
+		adopterID, ok := claims["id"].(float64)
+		if !ok {
+			return c.JSON(response.ResponseModel{
+				RetCode: "401",
+				Message: "Unauthorized: Missing adopter ID in token",
+				Data:    nil,
+			})
+		}
+
+		// Store adopter ID in context
+		c.Locals("adopter_id", uint(adopterID))
 		return c.Next()
 
 	}
-
 }
 
 // GetAdopterIDFromJWT retrieves the adopter ID from the JWT token stored in the Fiber context
