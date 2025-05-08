@@ -32,22 +32,23 @@ func AppRoutes(app *fiber.App) {
 	// =====================
 
 	pethubRoutes.Get("/user", controllers.GetAllAdopters)
-	pethubRoutes.Get("/user/:id", controllers.GetAdopterInfoByID)
+	pethubRoutes.Get("/user/:adopter_id", controllers.GetAdopterInfoByID)
 	pethubRoutes.Get("/users/profile/:id", controllers.GetAdopterInfoByID)
 	pethubRoutes.Put("/users/:id/update-info", controllers.UpdateAdopterDetails)
 	pethubRoutes.Post("/users/:id/upload-media", controllers.UploadAdopterMedia)
 	pethubRoutes.Get("/adopter/:id", controllers.GetAdopterProfile)
 	pethubRoutes.Put("/adopter/:id", controllers.EditAdopterProfile)
-	pethubRoutes.Post("/submission/:pet_id", controllers.CreateAdoptionSubmission)
+	pethubRoutes.Post("/adopter/:shelter_id/:pet_id/:adopter_id/adoption", controllers.CreateAdoption)
+	pethubRoutes.Get("/adopter/profile/:adopter_id", controllers.GetAdopterInfoByID)
 
 	// Adopter - Pet Related
-	app.Get("/users/petinfo", controllers.GetAllPets)
-	app.Get("/users/pets/:pet_id", controllers.GetPetByID)
-	app.Get("/user/:id/pet", controllers.GetShelterWithPetsByID)
-	app.Post("/users/status/:id", controllers.UpdatePetStatusToPending)
-	app.Get("/users/priority/", controllers.GetPetsWithTrueStatus)
-	app.Get("/users/allpets", controllers.GetAllPets)
-	app.Get("/users/pets/search/all", controllers.FetchAllPets)
+	pethubRoutes.Get("/users/petinfo", controllers.GetAllPets)
+	pethubRoutes.Get("/users/pets/:pet_id", controllers.GetPetByID)
+	pethubRoutes.Get("/user/:id/pet", controllers.GetShelterWithPetsByID)
+	pethubRoutes.Post("/users/status/:id", controllers.UpdatePetStatusToPending)
+	pethubRoutes.Get("/users/priority/", controllers.GetPetsWithTrueStatus)
+	pethubRoutes.Get("/users/allpets", controllers.GetAllPets)
+	pethubRoutes.Get("/users/pets/search/all", controllers.FetchAllPets)
 
 	// ---------------- Shelter Routes ----------------
 	app.Post("/shelter/register", controllers.RegisterShelter)
@@ -76,9 +77,9 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Put("/shelter/application/:application_id/approve", controllers.ApproveApplication)
 
 	// ---------------- General Shared Routes ----------------s
-	app.Get("/allshelter", controllers.GetShelters)
-	app.Get("/get/all/shelters", controllers.GetAllShelters)
-	app.Get("/users/shelters/:id", controllers.GetAllSheltersByID)
+	pethubRoutes.Get("/allshelter", controllers.GetShelters)
+	pethubRoutes.Get("/get/all/shelters", controllers.GetAllShelters)
+	pethubRoutes.Get("/users/shelters/:id", controllers.GetAllSheltersByID)
 
 	// ---------------- Forgot Password ----------------
 	app.Post("/shelter/forgot-password", controllers.ShelterForgotPassword)

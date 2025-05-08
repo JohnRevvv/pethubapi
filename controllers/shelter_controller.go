@@ -847,17 +847,16 @@ func GetAdoptionApplications(c *fiber.Ctx) error {
 
 	return c.JSON(responses)
 }
-
 func GetApplicationByApplicationID(c *fiber.Ctx) error {
 	applicationID := c.Params("application_id")
 
 	var adoptionSubmission models.AdoptionSubmission
 	infoResult := middleware.DBConn.Debug().Where("application_id = ?", applicationID).
 		Preload("Adopter").
-		Preload("Adopter.AdopterMedia"). 
+		Preload("Adopter.AdopterMedia").
 		Preload("Pet").
-		Preload("ValidIDs").
-		Preload("Pet.PetMedia").First(&adoptionSubmission)
+		Preload("Pet.PetMedia").
+		First(&adoptionSubmission)
 
 	if infoResult.Error != nil {
 		if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
@@ -866,19 +865,30 @@ func GetApplicationByApplicationID(c *fiber.Ctx) error {
 				Message: "Application not found",
 				Data:    nil,
 			})
-		} else{
-			return c.JSON(response.AdopterResponseModel{
-				RetCode: "500",
-				Message: "Something went wrong",
-				Data:    nil,
-			})
 		}
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Something went wrong",
+			Data:    nil,
+		})
+	}
+
+	// Manually fetch the ApplicationPhotos using ImageID
+	var appPhotos models.ApplicationPhotos
+	photoResult := middleware.DBConn.Debug().Where("image_id = ?", adoptionSubmission.ImageID).First(&appPhotos)
+	if photoResult.Error != nil && !errors.Is(photoResult.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Failed to retrieve application photos",
+			Data:    nil,
+		})
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Adoption details retrieved successfully",
 		"data": fiber.Map{
-			"info": adoptionSubmission,
+			"info":            adoptionSubmission,
+			"applicationPhotos": appPhotos,
 		},
 	})
 }
