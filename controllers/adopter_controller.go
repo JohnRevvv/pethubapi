@@ -216,6 +216,33 @@ func GetAllAdopters(c *fiber.Ctx) error {
 	})
 }
 
+func GetAdopterInfoOnly(c *fiber.Ctx) error {
+	adopterID := c.Params("adopter_id")
+
+	// Fetch shelter info by ID
+	var adopterInfo models.AdopterInfo
+	infoResult := middleware.DBConn.Where("adopter_id = ?", adopterID).First(&adopterInfo)
+
+	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "404",
+			Message: "Adopter not found",
+			Data:    nil,
+		})
+	} else if infoResult.Error != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Database error",
+			Data:    nil,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Adopter info retrieved successfully",
+		"data":    adopterInfo,
+	})
+}
+
 func GetAdopterInfoByID(c *fiber.Ctx) error {
 	adopterID := c.Params("adopter_id")
 
