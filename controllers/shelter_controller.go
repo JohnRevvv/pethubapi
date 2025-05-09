@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"pethub_api/middleware"
 	"pethub_api/models"
@@ -847,6 +846,7 @@ func GetAdoptionApplications(c *fiber.Ctx) error {
 
 	return c.JSON(responses)
 }
+
 func GetApplicationByApplicationID(c *fiber.Ctx) error {
 	applicationID := c.Params("application_id")
 
@@ -889,95 +889,6 @@ func GetApplicationByApplicationID(c *fiber.Ctx) error {
 		"data": fiber.Map{
 			"info":            adoptionSubmission,
 			"applicationPhotos": appPhotos,
-		},
-	})
-}
-
-func AddPetInfo(c *fiber.Ctx) error {
-	// Get ShelterID from route
-	shelterIDParam := c.Params("shelter_id")
-	shelterID, err := strconv.ParseUint(shelterIDParam, 10, 32)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Invalid Shelter ID",
-		})
-	}
-
-	// Parse pet age
-	petAgeStr := c.FormValue("pet_age")
-	petAge, err := strconv.Atoi(petAgeStr)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Invalid pet age",
-		})
-	}
-
-	// Create PetInfo
-	pet := models.PetInfo{
-		ShelterID:       uint(shelterID),
-		PetType:         c.FormValue("pet_type"),
-		PetName:         c.FormValue("pet_name"),
-		PetAge:          petAge,
-		AgeType:         c.FormValue("age_type"),
-		PetSex:          c.FormValue("pet_sex"),
-		PetSize:         c.FormValue("pet_size"),
-		PetDescriptions: c.FormValue("pet_descriptions"),
-		PriorityStatus:  c.FormValue("priority_status") == "1",
-		CreatedAt:       time.Now(),
-	}
-
-	tx := middleware.DBConn.Begin()
-	if err := tx.Create(&pet).Error; err != nil {
-		tx.Rollback()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to save pet info",
-		})
-	}
-
-	// Handle image
-	var petImageBase64 string
-	file, err := c.FormFile("pet_image1")
-	if file != nil && err == nil {
-		openFile, err := file.Open()
-		if err != nil {
-			tx.Rollback()
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "Failed to open uploaded image",
-			})
-		}
-		defer openFile.Close()
-
-		imageBytes, err := io.ReadAll(openFile)
-		if err != nil {
-			tx.Rollback()
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "Failed to read uploaded image",
-			})
-		}
-		petImageBase64 = base64.StdEncoding.EncodeToString(imageBytes)
-	} else {
-		petImageBase64 = c.FormValue("pet_image1") // fallback to base64 string form value
-	}
-
-	petMedia := models.PetMedia{
-		PetID:     pet.PetID,
-		PetImage1: petImageBase64,
-	}
-
-	if err := tx.Create(&petMedia).Error; err != nil {
-		tx.Rollback()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to save pet image",
-		})
-	}
-
-	tx.Commit()
-
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Pet added successfully",
-		"data": fiber.Map{
-			"pet_info": pet,
-			"image":    petMedia,
 		},
 	})
 }
