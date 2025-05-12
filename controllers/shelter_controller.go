@@ -4,13 +4,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"pethub_api/middleware"
 	"pethub_api/models"
 	"pethub_api/models/response"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -848,6 +846,7 @@ func GetAdoptionApplications(c *fiber.Ctx) error {
 
 	return c.JSON(responses)
 }
+
 func GetApplicationByApplicationID(c *fiber.Ctx) error {
 	applicationID := c.Params("application_id")
 
@@ -891,203 +890,5 @@ func GetApplicationByApplicationID(c *fiber.Ctx) error {
 			"info":              adoptionSubmission,
 			"applicationPhotos": appPhotos,
 		},
-	})
-}
-
-func AddPetInfo(c *fiber.Ctx) error {
-	// Get ShelterID from route
-	shelterIDParam := c.Params("shelter_id")
-	shelterID, err := strconv.ParseUint(shelterIDParam, 10, 32)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Invalid Shelter ID",
-		})
-	}
-
-	// Parse pet age
-	petAgeStr := c.FormValue("pet_age")
-	petAge, err := strconv.Atoi(petAgeStr)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Invalid pet age",
-		})
-	}
-
-	// Create PetInfo
-	pet := models.PetInfo{
-		ShelterID:       uint(shelterID),
-		PetType:         c.FormValue("pet_type"),
-		PetName:         c.FormValue("pet_name"),
-		PetAge:          petAge,
-		AgeType:         c.FormValue("age_type"),
-		PetSex:          c.FormValue("pet_sex"),
-		PetSize:         c.FormValue("pet_size"),
-		PetDescriptions: c.FormValue("pet_descriptions"),
-		PriorityStatus:  c.FormValue("priority_status") == "1",
-		CreatedAt:       time.Now(),
-	}
-
-	tx := middleware.DBConn.Begin()
-	if err := tx.Create(&pet).Error; err != nil {
-		tx.Rollback()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to save pet info",
-		})
-	}
-
-	// Handle image
-	var petImageBase64 string
-	file, err := c.FormFile("pet_image1")
-	if file != nil && err == nil {
-		openFile, err := file.Open()
-		if err != nil {
-			tx.Rollback()
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "Failed to open uploaded image",
-			})
-		}
-		defer openFile.Close()
-
-		imageBytes, err := io.ReadAll(openFile)
-		if err != nil {
-			tx.Rollback()
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "Failed to read uploaded image",
-			})
-		}
-		petImageBase64 = base64.StdEncoding.EncodeToString(imageBytes)
-	} else {
-		petImageBase64 = c.FormValue("pet_image1") // fallback to base64 string form value
-	}
-
-	petMedia := models.PetMedia{
-		PetID:     pet.PetID,
-		PetImage1: petImageBase64,
-	}
-
-	if err := tx.Create(&petMedia).Error; err != nil {
-		tx.Rollback()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to save pet image",
-		})
-	}
-
-	tx.Commit()
-
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Pet added successfully",
-		"data": fiber.Map{
-			"pet_info": pet,
-			"image":    petMedia,
-		},
-	})
-}
-
-func ReviewAdoptionApplication(c *fiber.Ctx) error {
-	// Use application_id instead of submission_id
-	applicationID := c.Params("application_id")
-	action := c.Params("action")
-
-	var submission models.AdoptionSubmission
-	if err := middleware.DBConn.First(&submission, applicationID).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "Adoption submission not found",
-		})
-	}
-
-	switch action {
-	case "approve":
-		submission.Status = "Approved"
-	case "disapprove":
-		submission.Status = "Disapproved"
-	default:
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid action",
-		})
-	}
-
-	if err := middleware.DBConn.Save(&submission).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to update submission status",
-		})
-	}
-
-	return c.JSON(fiber.Map{
-		"message": "Application status updated successfully",
-	})
-}
-
-// SetInterviewTime allows the shelter to set the interview time and type (online/face-to-face) for an approved application.
-func SetInterviewTime(c *fiber.Ctx) error {
-	// Get the submission_id from the route params
-	submissionID := c.Params("application_id")
-	var interviewDetails struct {
-		InterviewTime string `json:"interview_time"` // Interview date/time (e.g., "May 12, 2025 at 2:00 PM")
-		Platform      string `json:"platform"`       // Interview platform (e.g., "Face-to-Face at Pethub Shelter Office")
-	}
-
-	// Parse the body to get interview details
-	if err := c.BodyParser(&interviewDetails); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
-	}
-
-	// Validate the interview setting
-	interviewSetting := interviewDetails.InterviewTime + " via " + interviewDetails.Platform
-
-	// Check if interview setting is empty
-	if interviewSetting == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Interview setting is required.",
-		})
-	}
-
-	// Split the interviewSetting into time and platform
-	parts := strings.Split(interviewSetting, " via ")
-
-	// Ensure there are exactly two parts: time and platform
-	if len(parts) != 2 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Interview setting must include both time and platform, formatted as 'Month Day, Year at HH:MM AM/PM via Platform'.",
-		})
-	}
-
-	// Validate interview time (custom format check: "Month Day, Year at HH:MM AM/PM")
-	interviewTime := parts[0]
-	_, err := time.Parse("January 2, 2006 at 3:04 PM", interviewTime) // Custom format "Month Day, Year at HH:MM AM/PM"
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid interview time format. Please use 'Month Day, Year at HH:MM AM/PM'.",
-		})
-	}
-
-	// Validate the platform (simple check for non-empty string)
-	platform := parts[1]
-	if platform == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Interview platform is required.",
-		})
-	}
-
-	// Find the adoption submission
-	var submission models.AdoptionSubmission
-	if err := middleware.DBConn.First(&submission, submissionID).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "Adoption submission not found",
-		})
-	}
-
-	// Update the interview setting for the approved submission
-	submission.InterviewSetting = interviewSetting
-	if err := middleware.DBConn.Save(&submission).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to update interview details",
-		})
-	}
-
-	// Return the updated interview details
-	return c.JSON(fiber.Map{
-		"message": "Interview time and platform updated successfully",
 	})
 }

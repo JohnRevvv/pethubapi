@@ -9,6 +9,8 @@ import (
 	"pethub_api/models"
 	"pethub_api/models/response"
 	"strconv"
+	"time"
+
 	//"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -28,25 +30,144 @@ type PetResponse struct {
 	PetDescriptions string   `json:"pet_descriptions"`
 	ShelterID       uint     `json:"shelter_id"`
 	PetImages       []string `json:"pet_image1"`
+	PetVaccine      string   `json:"pet_vaccine"`
+}
+
+func AddPetInfo(c *fiber.Ctx) error {
+	// Get ShelterID from route
+	shelterIDParam := c.Params("shelter_id")
+	shelterID, err := strconv.ParseUint(shelterIDParam, 10, 32)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid Shelter ID",
+		})
+	}
+
+	// Parse pet age
+	petAgeStr := c.FormValue("pet_age")
+	petAge, err := strconv.Atoi(petAgeStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid pet age",
+		})
+	}
+
+	// Create PetInfo
+	pet := models.PetInfo{
+		ShelterID:       uint(shelterID),
+		PetType:         c.FormValue("pet_type"),
+		PetName:         c.FormValue("pet_name"),
+		PetAge:          petAge,
+		AgeType:         c.FormValue("age_type"),
+		PetSex:          c.FormValue("pet_sex"),
+		PetSize:         c.FormValue("pet_size"),
+		PetDescriptions: c.FormValue("pet_descriptions"),
+		PriorityStatus:  c.FormValue("priority_status") == "1",
+		CreatedAt:       time.Now(),
+	}
+
+	tx := middleware.DBConn.Begin()
+	if err := tx.Create(&pet).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to save pet info",
+		})
+	}
+
+	// Handle image
+	var petImageBase64 string
+	file, err := c.FormFile("pet_image1")
+	if file != nil && err == nil {
+		openFile, err := file.Open()
+		if err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Failed to open uploaded image",
+			})
+		}
+		defer openFile.Close()
+
+		imageBytes, err := io.ReadAll(openFile)
+		if err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Failed to read uploaded image",
+			})
+		}
+		petImageBase64 = base64.StdEncoding.EncodeToString(imageBytes)
+	} else {
+		petImageBase64 = c.FormValue("pet_image1") // fallback to base64 string form value
+	}
+
+	var petVaccineBase64 string
+	file, err = c.FormFile("pet_vaccine")
+	if file != nil && err == nil {
+		openFile, err := file.Open()
+		if err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Failed to open uploaded image",
+			})
+		}
+		defer openFile.Close()
+
+		imageBytes, err := io.ReadAll(openFile)
+		if err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Failed to read uploaded image",
+			})
+		}
+		petVaccineBase64 = base64.StdEncoding.EncodeToString(imageBytes)
+	} else {
+		petVaccineBase64 = c.FormValue("pet_vaccine") // fallback to base64 string form value
+	}
+
+	petMedia := models.PetMedia{
+		PetID:      pet.PetID,
+		PetImage1:  petImageBase64,
+		PetVaccine: petVaccineBase64,
+	}
+
+	if err := tx.Create(&petMedia).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to save pet image",
+		})
+	}
+
+	tx.Commit()
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "Pet added successfully",
+		"data": fiber.Map{
+			"pet_info": pet,
+			"image":    petMedia,
+		},
+	})
 }
 
 func FetchAndSearchPets(c *fiber.Ctx) error {
 	// Get filters from query parameters
 	shelterID := c.Params("id")
 	petName := c.Query("pet_name")
+	petStatus := c.Query("status")
 	petSex := c.Query("sex")
 	petType := c.Query("type")
 	prioritystatus := c.Query("priority_status")
 
 	var pets []models.PetInfo
 
-	query := middleware.DBConn.Where("status = ? AND shelter_id = ?", "available", shelterID)
+	query := middleware.DBConn.Where("shelter_id = ?", shelterID)
 
 	// if shelterID != "" {
 	// 	query = query.Where("shelter_id = ?", shelterID)
 	// }
 	if petName != "" {
 		query = query.Where("pet_name ILIKE ?", "%"+petName+"%")
+	}
+	if petStatus != "" {
+		query = query.Where("status = ?", petStatus)
 	}
 	if petSex != "" {
 		query = query.Where("pet_sex = ?", petSex)
@@ -98,13 +219,13 @@ func FetchAndSearchPets(c *fiber.Ctx) error {
 	var petResponses []PetResponse
 	for _, pet := range pets {
 		petResponses = append(petResponses, PetResponse{
-			PetID:     pet.PetID,
-			PetType:   pet.PetType,
-			PetName:   pet.PetName,
-			PetSex:    pet.PetSex,
+			PetID:          pet.PetID,
+			PetType:        pet.PetType,
+			PetName:        pet.PetName,
+			PetSex:         pet.PetSex,
 			PriorityStatus: pet.PriorityStatus,
-			ShelterID: pet.ShelterID,
-			PetImages: petMediaMap[pet.PetID],
+			ShelterID:      pet.ShelterID,
+			PetImages:      petMediaMap[pet.PetID],
 		})
 	}
 
@@ -206,7 +327,37 @@ func getPetIDs(pets []models.PetInfo) []uint {
 	return petIDs
 }
 
+
+//current na gamit
 func GetPetInfoByPetID(c *fiber.Ctx) error {
+	petID := c.Params("id")
+
+	var petInfo models.PetInfo
+	infoResult := middleware.DBConn.Debug().Preload("PetMedia").Where("pet_id = ?", petID).First(&petInfo)
+
+	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "404",
+			Message: "Pet info not found",
+			Data:    nil,
+		})
+	} else if infoResult.Error != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error while fetching pet info",
+			Data:    infoResult.Error,
+		})
+	}
+
+	return c.JSON(response.ShelterResponseModel{
+		RetCode: "200",
+		Message: "Pet info retrieved successfully",
+		Data: fiber.Map{
+			"pet": petInfo,
+		}})
+}
+
+func GetPetInfoByPetID2(c *fiber.Ctx) error {
 	// Get the pet_id from the URL params
 	petID := c.Params("id")
 
@@ -266,6 +417,7 @@ func GetPetInfoByPetID(c *fiber.Ctx) error {
 		PriorityStatus:  petInfo.PriorityStatus,
 		ShelterID:       petInfo.ShelterID,
 		PetImages:       petImages, // Attach pet images
+		PetVaccine:      petInfo.PetMedia.PetVaccine,
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
@@ -288,7 +440,6 @@ func UpdatePetInfo(c *fiber.Ctx) error {
 			Message: "Pet info not found",
 			Data:    nil,
 		})
-
 	} else if infoResult.Error != nil {
 		return c.JSON(response.ShelterResponseModel{
 			RetCode: "500",
@@ -305,7 +456,7 @@ func UpdatePetInfo(c *fiber.Ctx) error {
 	petInfo.PetDescriptions = c.FormValue("pet_descriptions")
 	petInfo.AgeType = c.FormValue("age_type")
 
-	// Handle age field (assuming it's an integer)
+	// Handle age field
 	ageStr := c.FormValue("pet_age")
 	petAge, err := strconv.Atoi(ageStr)
 	if err != nil {
@@ -320,56 +471,37 @@ func UpdatePetInfo(c *fiber.Ctx) error {
 	// Update PetInfo in the database
 	middleware.DBConn.Table("petinfo").Where("pet_id = ?", petID).Updates(&petInfo)
 
-	// Update PetMedia if image is provided
-	fileHeader, err := c.FormFile("pet_image1")
-	if err != nil {
-		// If no image was uploaded, continue without updating pet image
-		if err != fiber.ErrBadRequest {
-			return c.JSON(response.ShelterResponseModel{
-				RetCode: "400",
-				Message: "Failed to get image file",
-				Data:    err,
-			})
-		}
-	} else {
-		// Open the uploaded file
-		file, err := fileHeader.Open()
-		if err != nil {
-			return c.JSON(response.ShelterResponseModel{
-				RetCode: "400",
-				Message: "Failed to open image file",
-				Data:    err,
-			})
-		}
-		defer file.Close()
-
-		// Read the file into a buffer
-		buf := bytes.NewBuffer(nil)
-		if _, err := io.Copy(buf, file); err != nil {
-			return c.JSON(response.ShelterResponseModel{
-				RetCode: "400",
-				Message: "Failed to read image file",
-				Data:    err,
-			})
-		}
-
-		// Encode the image to base64
-		base64Image := base64.StdEncoding.EncodeToString(buf.Bytes())
-
-		// Save to the petmedia table
-		var petMedia models.PetMedia
-		err = middleware.DBConn.Debug().Table("petmedia").Where("pet_id = ?", petID).First(&petMedia).Error
-		if err != nil {
-			// Handle missing record for petMedia
-			petMedia.PetID = petInfo.PetID
-		}
-
-		// Update or insert the pet image
-		petMedia.PetImage1 = base64Image
-		middleware.DBConn.Table("petmedia").Where("pet_id = ?", petID).Updates(&petMedia)
+	// Fetch or prepare PetMedia
+	var petMedia models.PetMedia
+	err = middleware.DBConn.Table("petmedia").Where("pet_id = ?", petID).First(&petMedia).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		petMedia.PetID = petInfo.PetID
 	}
 
-	// Return a successful response
+	// Process pet_image1
+	imageFile, err := c.FormFile("pet_image1")
+	if err == nil {
+		file, _ := imageFile.Open()
+		defer file.Close()
+		buf := new(bytes.Buffer)
+		io.Copy(buf, file)
+		petMedia.PetImage1 = base64.StdEncoding.EncodeToString(buf.Bytes())
+	}
+
+	// Process pet_vaccine
+	vaccineFile, err := c.FormFile("pet_vaccine")
+	if err == nil {
+		file, _ := vaccineFile.Open()
+		defer file.Close()
+		buf := new(bytes.Buffer)
+		io.Copy(buf, file)
+		petMedia.PetVaccine = base64.StdEncoding.EncodeToString(buf.Bytes())
+	}
+
+	// Save PetMedia (update or insert)
+	middleware.DBConn.Table("petmedia").Where("pet_id = ?", petID).Save(&petMedia)
+
+	// Return success
 	return c.JSON(response.ShelterResponseModel{
 		RetCode: "200",
 		Message: "Pet info and media updated successfully",
@@ -378,42 +510,42 @@ func UpdatePetInfo(c *fiber.Ctx) error {
 }
 
 func UpdatePriorityStatus(c *fiber.Ctx) error {
-    petID := c.Params("id")
+	petID := c.Params("id")
 
-    // Fetch the existing PetInfo record
-    var petInfo models.PetInfo
-    infoResult := middleware.DBConn.Where("pet_id = ?", petID).First(&petInfo)
-    if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
-        return c.JSON(response.ShelterResponseModel{
-            RetCode: "404",
-            Message: "Pet info not found",
-            Data:    nil,
-        })
-    } else if infoResult.Error != nil {
-        return c.JSON(response.ShelterResponseModel{
-            RetCode: "500",
-            Message: "Database error while fetching pet info",
-            Data:    infoResult.Error,
-        })
-    }
+	// Fetch the existing PetInfo record
+	var petInfo models.PetInfo
+	infoResult := middleware.DBConn.Where("pet_id = ?", petID).First(&petInfo)
+	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "404",
+			Message: "Pet info not found",
+			Data:    nil,
+		})
+	} else if infoResult.Error != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error while fetching pet info",
+			Data:    infoResult.Error,
+		})
+	}
 
-    // Toggle the priority status
-    petInfo.PriorityStatus = !petInfo.PriorityStatus // Toggle the boolean value
+	// Toggle the priority status
+	petInfo.PriorityStatus = !petInfo.PriorityStatus // Toggle the boolean value
 
-    // Update only the priority_status field in the database
-    if err := middleware.DBConn.Model(&petInfo).Update("priority_status", petInfo.PriorityStatus).Error; err != nil {
-        return c.JSON(response.ShelterResponseModel{
-            RetCode: "500",
-            Message: "Error updating priority status",
-            Data:    err.Error(),
-        })
-    }
+	// Update only the priority_status field in the database
+	if err := middleware.DBConn.Model(&petInfo).Update("priority_status", petInfo.PriorityStatus).Error; err != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Error updating priority status",
+			Data:    err.Error(),
+		})
+	}
 
-    return c.JSON(response.ShelterResponseModel{
-        RetCode: "200",
-        Message: "Pet priority status updated successfully",
-        Data:    petInfo,
-    })
+	return c.JSON(response.ShelterResponseModel{
+		RetCode: "200",
+		Message: "Pet priority status updated successfully",
+		Data:    petInfo,
+	})
 }
 
 func SetPetStatusToArchive(c *fiber.Ctx) error {

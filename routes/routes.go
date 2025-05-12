@@ -32,7 +32,7 @@ func AppRoutes(app *fiber.App) {
 	// =====================
 
 	pethubRoutes.Get("/user", controllers.GetAllAdopters)
-	pethubRoutes.Get("/user/:adopter_id", controllers.GetAdopterInfoByID)
+	pethubRoutes.Get("/user/:adopter_id", controllers.GetAdopterInfoOnly)
 	pethubRoutes.Get("/users/profile/:id", controllers.GetAdopterInfoByID)
 	pethubRoutes.Put("/users/:id/update-info", controllers.UpdateAdopterDetails)
 	pethubRoutes.Post("/users/:id/upload-media", controllers.UploadAdopterMedia)
