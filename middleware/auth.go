@@ -100,7 +100,7 @@ func JWTMiddleware() fiber.Handler {
 
 // GetAdopterIDFromJWT retrieves the adopter ID from the JWT token stored in the Fiber context
 func GetAdopterIDFromJWT(c *fiber.Ctx) (uint, error) {
-	adopterID, ok := c.Locals("adopter_id").(float64) // JWT claims are stored as float64 in Go
+	adopterID, ok := c.Locals("adopter_id").(uint) // JWT claims are stored as float64 in Go
 	if !ok {
 		return 0, fmt.Errorf("adopter ID not found in context")
 	}
