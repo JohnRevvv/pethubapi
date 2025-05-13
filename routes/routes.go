@@ -37,7 +37,7 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Put("/users/:id/update-info", controllers.UpdateAdopterDetails)
 	pethubRoutes.Post("/users/:id/upload-media", controllers.UploadAdopterMedia)
 	pethubRoutes.Get("/adopter/:id", controllers.GetAdopterProfile)
-	pethubRoutes.Put("/adopter/:id", controllers.EditAdopterProfile)
+	pethubRoutes.Post("/adopter/:adopter_id/edit", controllers.EditAdopterProfile)
 	pethubRoutes.Post("/adopter/:shelter_id/:pet_id/:adopter_id/adoption", controllers.CreateAdoption)
 	pethubRoutes.Get("/adopter/profile/:adopter_id", controllers.GetAdopterInfoByID)
 
@@ -58,7 +58,7 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Get("/shelter/:id", controllers.GetShelterInfoByID)
 	pethubRoutes.Put("/shelter/:id/update-info", controllers.UpdateShelterDetails)
 	pethubRoutes.Post("/shelter/:id/upload-media", controllers.UploadShelterMedia)
-	// pethubRoutes.Post("/shelter/:id/add-pet-info", controllers.AddPetInfo)
+	pethubRoutes.Get("/shelter/:shelter_id/refined", controllers.GetShelterDetailsRefined)
 	pethubRoutes.Get("/shelter/:id/petinfo", controllers.GetPetInfoByPetID)
 	pethubRoutes.Put("/shelter/:id/update-pet-info", controllers.UpdatePetInfo)
 	pethubRoutes.Put("/shelter/:id/archive-pet", controllers.SetPetStatusToArchive)

@@ -480,52 +480,29 @@ func GetShelterInfoByID(c *fiber.Ctx) error {
 	})
 }
 
-func GetShelterDetailsByID(c *fiber.Ctx) error {
-	shelterID := c.Params("id")
+func GetShelterDetailsRefined(c *fiber.Ctx) error {
+	ShelterID := c.Params("shelter_id")
 
-	// Fetch shelter info by ID
-	var shelterInfo models.ShelterInfo
-	infoResult := middleware.DBConn.Where("shelter_id = ?", shelterID).First(&shelterInfo)
+	var ShelterInfo models.ShelterInfo
+	infoResult := middleware.DBConn.Debug().Preload("ShelterMedia").Where("shelter_id = ?", ShelterID).First(&ShelterInfo)
 
-	// If no shelter info is found, set it to null
-	var infoResponse interface{}
 	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
-		infoResponse = nil
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "404",
+			Message: "Shelter Not Found",
+			Data:    nil,
+		})
 	} else if infoResult.Error != nil {
 		return c.JSON(response.ShelterResponseModel{
 			RetCode: "500",
 			Message: "Database error while fetching shelter info",
-			Data:    nil,
+			Data:    infoResult.Error,
 		})
-	} else {
-		infoResponse = shelterInfo
 	}
-
-	// Fetch shelter media by ID
-	var shelterMedia models.ShelterMedia
-	mediaResult := middleware.DBConn.Where("shelter_id = ?", shelterID).First(&shelterMedia)
-
-	// If no shelter media is found, set it to null
-	var mediaResponse interface{}
-	if errors.Is(mediaResult.Error, gorm.ErrRecordNotFound) {
-		mediaResponse = nil
-	} else if mediaResult.Error != nil {
-		return c.JSON(response.ShelterResponseModel{
-			RetCode: "400",
-			Message: "Database error while fetching shelter media",
-			Data:    nil,
-		})
-	} else {
-		mediaResponse = shelterMedia
-	}
-
-	// Combine shelter info and media into a single response
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Shelter details retrieved successfully",
-		"data": fiber.Map{
-			"info":  infoResponse,
-			"media": mediaResponse,
-		},
+	return c.Status(fiber.StatusOK).JSON(response.ShelterResponseModel{
+		RetCode: "200",
+		Message: "Success",
+		Data:    ShelterInfo,
 	})
 }
 
@@ -887,7 +864,7 @@ func GetApplicationByApplicationID(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Adoption details retrieved successfully",
 		"data": fiber.Map{
-			"info":            adoptionSubmission,
+			"info":              adoptionSubmission,
 			"applicationPhotos": appPhotos,
 		},
 	})
@@ -901,17 +878,17 @@ func ApproveApplication(c *fiber.Ctx) error {
 	Result := middleware.DBConn.Debug().Where("application_id = ?", applicationID).First(&application)
 
 	if Result.Error != nil {
-		if errors.Is(Result.Error, gorm.ErrRecordNotFound){
+		if errors.Is(Result.Error, gorm.ErrRecordNotFound) {
 			return c.JSON(response.ShelterResponseModel{
 				RetCode: "404",
 				Message: "Application not found",
-				Data: nil,
+				Data:    nil,
 			})
 		}
 		return c.JSON(response.ShelterResponseModel{
 			RetCode: "500",
 			Message: "Database error",
-			Data: Result.Error,
+			Data:    Result.Error,
 		})
 	}
 
@@ -919,7 +896,7 @@ func ApproveApplication(c *fiber.Ctx) error {
 		return c.JSON(response.ShelterResponseModel{
 			RetCode: "400",
 			Message: "Pet is already approved",
-			Data: nil,
+			Data:    nil,
 		})
 	}
 
@@ -930,13 +907,13 @@ func ApproveApplication(c *fiber.Ctx) error {
 		return c.JSON(response.ShelterResponseModel{
 			RetCode: "500",
 			Message: "Database error",
-			Data: updateResult.Error,
+			Data:    updateResult.Error,
 		})
 	}
 
 	return c.JSON(response.ShelterResponseModel{
 		RetCode: "200",
 		Message: "Status updated",
-		Data: application,
+		Data:    application,
 	})
 }

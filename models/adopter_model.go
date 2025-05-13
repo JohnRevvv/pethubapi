@@ -32,6 +32,7 @@ type AdopterInfo struct {
 	Occupation    string       `json:"occupation"`
 	CivilStatus   string       `json:"civil_status"`
 	SocialMedia   string       `json:"social_media"`
+	
 	AdopterMedia  AdopterMedia `gorm:"foreignKey:AdopterID;references:AdopterID" json:"adoptermedia"`
 }
 

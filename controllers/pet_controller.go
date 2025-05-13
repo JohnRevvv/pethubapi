@@ -327,7 +327,6 @@ func getPetIDs(pets []models.PetInfo) []uint {
 	return petIDs
 }
 
-
 //current na gamit
 func GetPetInfoByPetID(c *fiber.Ctx) error {
 	petID := c.Params("id")
@@ -352,9 +351,8 @@ func GetPetInfoByPetID(c *fiber.Ctx) error {
 	return c.JSON(response.ShelterResponseModel{
 		RetCode: "200",
 		Message: "Pet info retrieved successfully",
-		Data: fiber.Map{
-			"pet": petInfo,
-		}})
+		Data:   petInfo,
+	})
 }
 
 func GetPetInfoByPetID2(c *fiber.Ctx) error {
