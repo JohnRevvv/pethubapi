@@ -418,6 +418,33 @@ func GetShelterWithPetsByID(c *fiber.Ctx) error {
 	})
 }
 
+func GetOtherPetsByAdopterID(c *fiber.Ctx) error {
+	shelterID := c.Params("shelter_id")
+
+	var petInfo []models.PetInfo
+	PetResult := middleware.DBConn.Debug().Preload("PetMedia").Where("shelter_id = ? AND status = ?", shelterID, "available").Find(&petInfo)
+	if errors.Is(PetResult.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "404",
+			Message: "Pets not found",
+			Data:    nil,
+		})
+	} else if PetResult.Error != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Database error",
+			Data:    nil,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Shelter and pets retrieved successfully",
+		"data": fiber.Map{
+			"pets": petInfo,
+		},
+	})
+}
+
 func CreateAdoption(c *fiber.Ctx) error {
 	shelterIDStr := c.Params("shelter_id")
 	petIDStr := c.Params("pet_id")
@@ -525,13 +552,25 @@ func CreateAdoption(c *fiber.Ctx) error {
 	if err := middleware.DBConn.First(&pet, petID).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{"message": "Pet not found"})
 	}
-	if pet.Status == "pending" {
-		return c.Status(400).JSON(fiber.Map{"message": "Pet is not available"})
+	// Check if the pet is already adopted or unavailable
+	if pet.Status == "adopted" {
+		return c.Status(400).JSON(fiber.Map{"message": "Pet has already been adopted"})
 	}
 
-	pet.Status = "pending"
-	if err := middleware.DBConn.Save(&pet).Error; err != nil {
-		return c.Status(500).JSON(fiber.Map{"message": "Failed to update pet status"})
+	// Count current adoption submissions for this pet
+	var adoptionCount int64
+	if err := middleware.DBConn.Model(&models.AdoptionSubmission{}).
+		Where("pet_id = ?", petID).
+		Count(&adoptionCount).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"message": "Failed to count adoptions"})
+	}
+
+	// If 3 or more adoptions, set pet status to "pending"
+	if adoptionCount >= 3 {
+		pet.Status = "unavailable"
+		if err := middleware.DBConn.Save(&pet).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"message": "Failed to update pet status"})
+		}
 	}
 
 	return c.Status(201).JSON(fiber.Map{
@@ -723,10 +762,17 @@ func EditAdopterProfileOLD(c *fiber.Ctx) error {
 }
 
 func EditAdopterProfile(c *fiber.Ctx) error {
-	adopterId := c.Params("adopter_id")
+	adopterIdParam := c.Params("adopter_id")
+	adopterId, err := strconv.Atoi(adopterIdParam)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(response.AdopterResponseModel{
+			RetCode: "400",
+			Message: "Invalid adopter ID",
+			Data:    nil,
+		})
+	}
 
 	var adopterInfo models.AdopterInfo
-
 	infoResult := middleware.DBConn.Where("adopter_id = ?", adopterId).First(&adopterInfo)
 	if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
 		return c.JSON(response.AdopterResponseModel{
@@ -742,7 +788,8 @@ func EditAdopterProfile(c *fiber.Ctx) error {
 			Data:    nil,
 		})
 	}
-	
+
+	// Update adopter info fields
 	adopterInfo.FirstName = c.FormValue("first_name")
 	adopterInfo.LastName = c.FormValue("last_name")
 	adopterInfo.Address = c.FormValue("address")
@@ -753,33 +800,33 @@ func EditAdopterProfile(c *fiber.Ctx) error {
 	adopterInfo.SocialMedia = c.FormValue("social_media")
 
 	middleware.DBConn.Debug().Where("adopter_id = ?", adopterId).Updates(&adopterInfo)
-	
+
+	// Load or initialize media record
 	var adopterMedia models.AdopterMedia
 	mediaResult := middleware.DBConn.Where("adopter_id = ?", adopterId).First(&adopterMedia)
+
 	if errors.Is(mediaResult.Error, gorm.ErrRecordNotFound) {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "404",
-			Message: "Adopter media not found",
-			Data:    nil,
-		})
+		// Initialize a new record if not found
+		adopterMedia = models.AdopterMedia{
+			AdopterID: uint(adopterId),
+		}
 	}
-	if mediaResult.Error != nil {
-		return c.JSON(response.AdopterResponseModel{
-			RetCode: "500",
-			Message: "Database error",
-			Data:    nil,
-		})
-	}
+
+	// Handle image upload
 	imageFile, err := c.FormFile("adopter_profile")
 	if err == nil {
 		file, _ := imageFile.Open()
 		defer file.Close()
 		buf := new(bytes.Buffer)
 		io.Copy(buf, file)
-		adopterMedia.AdopterProfile = base64.StdEncoding.EncodeToString(buf.Bytes())
-	}
 
-	middleware.DBConn.Debug().Where("adopter_id = ?", adopterId).Save(&adopterMedia)
+		newImageBase64 := base64.StdEncoding.EncodeToString(buf.Bytes())
+
+		if newImageBase64 != "" {
+			adopterMedia.AdopterProfile = newImageBase64
+			middleware.DBConn.Debug().Save(&adopterMedia)
+		}
+	}
 
 	return c.JSON(response.AdopterResponseModel{
 		RetCode: "200",

@@ -13,7 +13,6 @@ import (
 )
 
 // GetAllPets retrieves all pet records from the petinfo table
-// GetAllPets retrieves all pet records from the petinfo table
 func GetAllPets(c *fiber.Ctx) error {
 	// Define a struct to include pet info and the pet_image1 field
 	type PetWithImage struct {
@@ -328,6 +327,7 @@ func FetchAndSearchAllPetsforAdopter(c *fiber.Ctx) error {
 	})
 }
 
+//working
 func FetchAllPets(c *fiber.Ctx) error {
 	// Get and sanitize filters from query parameters
 	petName := strings.TrimSpace(c.Query("pet_name"))
