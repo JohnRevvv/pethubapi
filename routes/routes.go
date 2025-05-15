@@ -50,6 +50,11 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Get("/users/priority/", controllers.GetPetsWithTrueStatus)
 	pethubRoutes.Get("/users/allpets", controllers.GetAllPets)
 	pethubRoutes.Get("/users/pets/search/all", controllers.FetchAllPets)
+	pethubRoutes.Get("/applications/adopter/:adopter_id", controllers.GetApplicationByAdopterID)
+	pethubRoutes.Get("/applications/pet/:pet_id", controllers.GetAdoptionApplicationsByPetID)
+	pethubRoutes.Get("/applications/status/:application_id", controllers.GetAdoptionSubmissionStatusByApplicationID)
+	pethubRoutes.Post("/reports/shelter/:shelter_id/adopter/:adopter_id", controllers.SubmitReport)
+
 
 	// ---------------- Shelter Routes ----------------
 	app.Post("/shelter/register", controllers.RegisterShelter)
