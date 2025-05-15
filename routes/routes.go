@@ -80,11 +80,13 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Get("/shelter/:application_id/application-details", controllers.GetApplicationByApplicationID)
 	pethubRoutes.Get("/shelterinfo/:shelter_id", controllers.GetShelterInfo)
 	pethubRoutes.Post("/shelter/:shelter_id/add-pet",controllers.AddPetInfo)
-	pethubRoutes.Put("/shelter/application/:application_id/approve", controllers.ApproveApplication)
 	pethubRoutes.Get("/shelter/count/:pet_id/applied", controllers.CountApplicantsByPetId)
 
 	pethubRoutes.Get("/shelter/:shelter_id/adoption", controllers.GetPetsWithAdoptionRequestsByShelter)
 	pethubRoutes.Get("/shelter/:pet_id/get/applications", controllers.GetAdoptionApplicationsByPetID)
+	pethubRoutes.Post("/shelter/application/:application_id/set-interview-date", controllers.SetInterviewSchedule)
+	pethubRoutes.Put("/shelter/application/:application_id/interview/reject", controllers.RejectApplication)
+
 
 	// ---------------- General Shared Routes ----------------s
 	pethubRoutes.Get("/allshelter", controllers.GetShelters)
