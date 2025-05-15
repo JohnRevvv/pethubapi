@@ -415,3 +415,260 @@ func FetchAllPets(c *fiber.Ctx) error {
 		},
 	})
 }
+
+func GetApplicationByAdopterID(c *fiber.Ctx) error {
+	adopterID := c.Params("adopter_id")
+
+	var adoptionSubmission models.AdoptionSubmission
+	infoResult := middleware.DBConn.Debug().Where("adopter_id = ?", adopterID).
+		Preload("Adopter").
+		Preload("Adopter.AdopterMedia").
+		Preload("Pet").
+		Preload("Pet.PetMedia").
+		First(&adoptionSubmission)
+
+	if infoResult.Error != nil {
+		if errors.Is(infoResult.Error, gorm.ErrRecordNotFound) {
+			return c.JSON(response.AdopterResponseModel{
+				RetCode: "404",
+				Message: "Application not found",
+				Data:    nil,
+			})
+		}
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Something went wrong",
+			Data:    nil,
+		})
+	}
+
+	// Manually fetch the ApplicationPhotos using ImageID
+	var appPhotos models.ApplicationPhotos
+	photoResult := middleware.DBConn.Debug().Where("image_id = ?", adoptionSubmission.ImageID).First(&appPhotos)
+	if photoResult.Error != nil && !errors.Is(photoResult.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Failed to retrieve application photos",
+			Data:    nil,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Adoption details retrieved successfully",
+		"data": fiber.Map{
+			"info":              adoptionSubmission,
+			"applicationPhotos": appPhotos,
+		},
+	})
+}
+
+func GetAdoptionApplicationsByAdopterID(c *fiber.Ctx) error {
+	adopterID := c.Params("adopter_id")
+
+	if adopterID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "adopter_id is required",
+		})
+	}
+
+	// Create a custom struct just for the response
+	type AdoptionApplicationResponse struct {
+		ApplicationID  uint   `json:"application_id"`
+		FirstName      string `json:"first_name"`
+		LastName       string `json:"last_name"`
+		AdopterProfile string `json:"adopter_profile"`
+		PetName        string `json:"pet_name"`
+		Status         string `json:"status"`
+	}
+
+	var applications []models.AdoptionSubmission
+	var responses []AdoptionApplicationResponse
+
+	// Fetch the adoption submissions with related data
+	if err := middleware.DBConn.Debug().
+		Where("adopter_id = ?", adopterID). // Filter by adopter_id
+		Preload("Adopter").
+		Preload("Adopter.AdopterMedia"). // Preload adopter media
+		Preload("Pet").
+		Preload("Pet.PetMedia"). // Preload pet media
+		Find(&applications).Error; err != nil {
+		return c.JSON(response.ResponseModel{
+			RetCode: "404",
+			Message: "Failed to fetch adoption applications",
+			Data:    err.Error(),
+		})
+	}
+
+	// Format the response to match the required fields
+	for _, app := range applications {
+		responses = append(responses, AdoptionApplicationResponse{
+			ApplicationID:  app.ApplicationID,
+			FirstName:      app.Adopter.FirstName,
+			LastName:       app.Adopter.LastName,
+			AdopterProfile: app.Adopter.AdopterMedia.AdopterProfile, // Assuming `AdopterProfile` is the field for the profile image
+			PetName:        app.Pet.PetName,                         // Assuming `PetName` is the pet's name field
+			Status:         app.Status,                              // Assuming `Status` is the field for application status
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Adoption applications retrieved successfully",
+		"data":    responses,
+	})
+}
+
+func GetAdoptionApplicationsByPetID(c *fiber.Ctx) error {
+	petID := c.Params("pet_id")
+
+	if petID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "pet_id is required",
+		})
+	}
+
+	// Create a custom struct just for the response
+	type PetDetailsResponse struct {
+		PetImage       string `json:"pet_image1"`
+		PetName        string `json:"pet_name"`
+		PetSex         string `json:"pet_sex"`
+		PetAge         int    `json:"pet_age"`
+		PetSize        string `json:"pet_size"`
+		PetDescription string `json:"pet_descriptions"`
+	}
+
+	var pet models.PetInfo
+	if err := middleware.DBConn.Debug().
+		Preload("PetMedia").
+		Where("pet_id = ?", petID).
+		First(&pet).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.JSON(response.ResponseModel{
+				RetCode: "404",
+				Message: "Pet not found",
+				Data:    nil,
+			})
+		}
+		return c.JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: "Failed to fetch pet details",
+			Data:    err.Error(),
+		})
+	}
+
+	// Format the response to include only the required fields
+	response := PetDetailsResponse{
+		PetImage:       pet.PetMedia.PetImage1, // Assuming PetImage1 is the field for the pet's image
+		PetName:        pet.PetName,
+		PetSex:         pet.PetSex,
+		PetAge:         pet.PetAge,
+		PetSize:        pet.PetSize,
+		PetDescription: pet.PetDescriptions,
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Pet details retrieved successfully",
+		"data":    response,
+	})
+}
+
+func GetAdoptionSubmissionStatusByApplicationID(c *fiber.Ctx) error {
+	applicationID := c.Params("application_id")
+
+	if applicationID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "application_id is required",
+		})
+	}
+
+	// Define a struct to hold the status
+	type SubmissionStatusResponse struct {
+		Status string `json:"status"`
+	}
+
+	var submission models.AdoptionSubmission
+	if err := middleware.DBConn.Debug().
+		Where("application_id = ?", applicationID).
+		First(&submission).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.JSON(response.ResponseModel{
+				RetCode: "404",
+				Message: "Submission not found",
+				Data:    nil,
+			})
+		}
+		return c.JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: "Failed to fetch submission status",
+			Data:    err.Error(),
+		})
+	}
+
+	// Return the status
+	return c.JSON(fiber.Map{
+		"message": "Submission status retrieved successfully",
+		"data": SubmissionStatusResponse{
+			Status: submission.Status,
+		},
+	})
+}
+
+func SubmitReport(c *fiber.Ctx) error {
+	// Parse the shelter_id and adopter_id from the route parameters
+	shelterIDStr := c.Params("shelter_id")
+	adopterIDStr := c.Params("adopter_id")
+
+	shelterID, err := strconv.Atoi(shelterIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid Shelter ID",
+		})
+	}
+
+	adopterID, err := strconv.Atoi(adopterIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid Adopter ID",
+		})
+	}
+
+	// Parse the request body to get the reason and description
+	requestBody := struct {
+		Reason      string `json:"reason"`
+		Description string `json:"description"`
+	}{}
+
+	if err := c.BodyParser(&requestBody); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid request body",
+		})
+	}
+
+	// Validate that reason and description are not empty
+	if requestBody.Reason == "" || requestBody.Description == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Reason and description are required",
+		})
+	}
+
+	// Insert the report into the database
+	report := models.Report{
+		ShelterID:   shelterID,
+		AdopterID:   adopterID,
+		Reason:      requestBody.Reason,
+		Description: requestBody.Description,
+		Status:      "reported", // Automatically set the status to "reported"
+		CreatedAt:   time.Now(),
+	}
+
+	if err := middleware.DBConn.Debug().Create(&report).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to submit report",
+			"error":   err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "Report submitted successfully",
+		"data":    report,
+	})
+}
