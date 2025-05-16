@@ -834,3 +834,28 @@ func EditAdopterProfile(c *fiber.Ctx) error {
 		Data:    adopterInfo,
 	})
 }
+func GetAdoptionNotifications(c *fiber.Ctx) error {
+	adopterID := c.Params("adopter_id")
+
+	var applications []models.AdoptionSubmission
+	if err := middleware.DBConn.Preload("Pet").Where("adopter_id = ?", adopterID).Order("created_at DESC").Find(&applications).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch applications",
+		})
+	}
+
+	var notifications []fiber.Map
+	for _, app := range applications {
+		notifications = append(notifications, fiber.Map{
+			"title":      "Adoption Application Update",
+			"message":    fmt.Sprintf("Your adoption application for %s is currently marked as '%s'.", app.Pet.PetName, app.Status),
+			"type":       "adoption_status",
+			"status":     app.Status,
+			"created_at": app.CreatedAt,
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"notifications": notifications,
+	})
+}
