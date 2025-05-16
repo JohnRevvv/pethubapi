@@ -55,6 +55,8 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Get("/applications/status/:application_id", controllers.GetAdoptionSubmissionStatusByApplicationID)
 	pethubRoutes.Post("/reports/shelter/:shelter_id/adopter/:adopter_id", controllers.SubmitReport)
 	pethubRoutes.Get("/applications/allpets/:adopter_id", controllers.ShowPetsByAdopterID)
+	pethubRoutes.Get("/adopter/:adopter_id/notifications", controllers.GetAdoptionNotifications)
+	
 
 
 	// ---------------- Shelter Routes ----------------
