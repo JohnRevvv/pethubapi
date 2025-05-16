@@ -6,12 +6,14 @@ import (
 	"pethub_api/middleware"
 	"pethub_api/models"
 	"pethub_api/models/response"
-	"strings"
+	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
 
+// GetAllPets retrieves all pet records from the petinfo table
 // GetAllPets retrieves all pet records from the petinfo table
 func GetAllPets(c *fiber.Ctx) error {
 	// Define a struct to include pet info and the pet_image1 field
@@ -327,20 +329,18 @@ func FetchAndSearchAllPetsforAdopter(c *fiber.Ctx) error {
 	})
 }
 
-//working
 func FetchAllPets(c *fiber.Ctx) error {
-	// Get and sanitize filters from query parameters
-	petName := strings.TrimSpace(c.Query("pet_name"))
-	petSex := strings.TrimSpace(c.Query("sex"))
-	petType := strings.TrimSpace(c.Query("type"))
-	priority := strings.ToLower(strings.TrimSpace(c.Query("priority_status"))) // expecting "true" or "false"
+	// Get filters from query parameters
+	petName := c.Query("pet_name")
+	petSex := c.Query("sex")
+	petType := c.Query("type")
+	prioritystatus := c.Query("priority_status")
 
 	var pets []models.PetInfo
 
-	// Start with base query: status = 'available'
+	// Start building the query without filtering by shelter_id
 	query := middleware.DBConn.Where("status = ?", "available")
 
-	// Apply filters
 	if petName != "" {
 		query = query.Where("pet_name ILIKE ?", "%"+petName+"%")
 	}
@@ -350,16 +350,14 @@ func FetchAllPets(c *fiber.Ctx) error {
 	if petType != "" {
 		query = query.Where("pet_type = ?", petType)
 	}
-	if priority == "true" {
-		query = query.Where("priority_status = ?", true)
-	} else if priority == "false" {
-		query = query.Where("priority_status = ?", false)
+	if prioritystatus != "" {
+		query = query.Where("priority_status = ?", prioritystatus)
 	}
 
 	// Execute the query
-	result := query.Order("created_at DESC").Find(&pets)
+	result := query.Order("priority_status DESC").Order("created_at DESC").Find(&pets)
 	if result.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(response.ShelterResponseModel{
+		return c.JSON(response.ShelterResponseModel{
 			RetCode: "500",
 			Message: "Database error while fetching pets",
 			Data:    result.Error,
@@ -367,19 +365,19 @@ func FetchAllPets(c *fiber.Ctx) error {
 	}
 
 	if len(pets) == 0 {
-		return c.Status(fiber.StatusNotFound).JSON(response.ShelterResponseModel{
+		return c.JSON(response.ShelterResponseModel{
 			RetCode: "404",
 			Message: "No pets found",
 			Data:    nil,
 		})
 	}
 
-	// Fetch pet images
+	// Pet media logic
 	petMediaMap := make(map[uint][]string)
 	var petMedia []models.PetMedia
 	petmediaResult := middleware.DBConn.Where("pet_id IN ?", getPetIDs(pets)).Find(&petMedia)
 	if petmediaResult.Error != nil && !errors.Is(petmediaResult.Error, gorm.ErrRecordNotFound) {
-		return c.Status(fiber.StatusInternalServerError).JSON(response.ShelterResponseModel{
+		return c.JSON(response.ShelterResponseModel{
 			RetCode: "500",
 			Message: "Database error while fetching pet media",
 			Data:    petmediaResult.Error,
@@ -394,7 +392,6 @@ func FetchAllPets(c *fiber.Ctx) error {
 		}
 	}
 
-	// Prepare response
 	var petResponses []PetResponse
 	for _, pet := range pets {
 		petResponses = append(petResponses, PetResponse{
@@ -417,10 +414,10 @@ func FetchAllPets(c *fiber.Ctx) error {
 }
 
 func GetApplicationByAdopterID(c *fiber.Ctx) error {
-	adopterID := c.Params("adopter_id")
+	applicationID := c.Params("application_id")
 
 	var adoptionSubmission models.AdoptionSubmission
-	infoResult := middleware.DBConn.Debug().Where("adopter_id = ?", adopterID).
+	infoResult := middleware.DBConn.Debug().Where("application_id = ?", applicationID).
 		Preload("Adopter").
 		Preload("Adopter.AdopterMedia").
 		Preload("Pet").
@@ -517,7 +514,7 @@ func GetAdoptionApplicationsByAdopterID(c *fiber.Ctx) error {
 	})
 }
 
-func GetAdoptionApplicationsByPetID(c *fiber.Ctx) error {
+func GetAdoptionApplicationsByPetID2(c *fiber.Ctx) error {
 	petID := c.Params("pet_id")
 
 	if petID == "" {
