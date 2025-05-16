@@ -672,3 +672,68 @@ func SubmitReport(c *fiber.Ctx) error {
 		"data":    report,
 	})
 }
+
+func ShowPetsByAdopterID(c *fiber.Ctx) error {
+	adopterID := c.Params("adopter_id")
+
+	if adopterID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "adopter_id is required",
+		})
+	}
+
+	type AdoptedListResponse struct {
+		ApplicationID uint   `json:"application_id"`
+		PetImage      string `json:"pet_image1"`
+		PetName       string `json:"pet_name"`
+		ShelterName   string `json:"shelter_name"`
+	}
+
+	var submissions []models.AdoptionSubmission
+	if err := middleware.DBConn.Where("adopter_id = ?", adopterID).Find(&submissions).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"retCode": "500",
+			"message": "Failed to fetch adoption submissions",
+			"data":    err.Error(),
+		})
+	}
+
+	if len(submissions) == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"retCode": "404",
+			"message": "No pets found for the adopter",
+			"data":    nil,
+		})
+	}
+
+	var results []AdoptedListResponse
+
+	for _, submission := range submissions {
+		var pet models.PetInfo
+		if err := middleware.DBConn.Where("pet_id = ?", submission.PetID).First(&pet).Error; err != nil {
+			continue
+		}
+
+		var petMedia models.PetMedia
+		if err := middleware.DBConn.Where("pet_id = ?", submission.PetID).First(&petMedia).Error; err != nil {
+			petMedia.PetImage1 = ""
+		}
+
+		var shelter models.ShelterInfo
+		if err := middleware.DBConn.Where("shelter_id = ?", pet.ShelterID).First(&shelter).Error; err != nil {
+			shelter.ShelterName = ""
+		}
+
+		results = append(results, AdoptedListResponse{
+			ApplicationID: submission.ApplicationID,
+			PetImage:      petMedia.PetImage1,
+			PetName:       pet.PetName,
+			ShelterName:   shelter.ShelterName,
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Adopted pets retrieved successfully",
+		"data":    results,
+	})
+}
