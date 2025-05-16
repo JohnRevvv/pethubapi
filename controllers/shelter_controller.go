@@ -745,6 +745,8 @@ func GetShelterByName(c *fiber.Ctx) error {
 	})
 }
 
+
+//old
 func GetAdoptionApplications(c *fiber.Ctx) error {
 	shelterID := c.Params("id")
 	status := c.Query("status")
@@ -764,6 +766,8 @@ func GetAdoptionApplications(c *fiber.Ctx) error {
 		PetName        string `json:"pet_name"`
 		Status         string `json:"status"`
 		CreatedAt      string `json:"created_at"`
+
+
 	}
 
 	var applications []models.AdoptionSubmission
@@ -775,6 +779,7 @@ func GetAdoptionApplications(c *fiber.Ctx) error {
 		Preload("Adopter").
 		Preload("Adopter.AdopterMedia"). // Preload adopter media
 		Preload("Pet").                  // Preload pet data
+		Preload("ScheduleInterview").
 		Find(&applications).Error; err != nil {
 		return c.JSON(response.ResponseModel{
 			RetCode: "404",
@@ -798,6 +803,46 @@ func GetAdoptionApplications(c *fiber.Ctx) error {
 
 	return c.JSON(responses)
 }
+//new
+func GetAdoptionSubmissionsByShelterAndStatus(c *fiber.Ctx) error {
+	shelterID := c.Params("shelter_id")
+	status := c.Query("status") // Example: ?status=approved
+
+	var submissions []models.AdoptionSubmission
+	result := middleware.DBConn.Debug().
+		Preload("Adopter").
+		Preload("Adopter.AdopterMedia").
+		Preload("Pet").
+		Preload("Pet.PetMedia").
+		Preload("ScheduleInterview").
+		Where("shelter_id = ? AND status = ?", shelterID, status).
+		Find(&submissions)
+
+	if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error while fetching submissions",
+			Data:    result.Error.Error(),
+		})
+	}
+
+	if len(submissions) == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(response.ShelterResponseModel{
+			RetCode: "404",
+			Message: "No adoption submissions found",
+			Data:    nil,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Success",
+		"data": fiber.Map{
+			"submissions": submissions,
+		},
+	})
+}
+
+
 
 func GetApplicationByApplicationID(c *fiber.Ctx) error {
 	applicationID := c.Params("application_id")
@@ -1142,6 +1187,8 @@ func GetAdoptionApplicationsByPetID(c *fiber.Ctx) error {
 		AdopterProfile string `json:"adopter_profile"`
 		PetName        string `json:"pet_name"`
 		Address        string `json:"address"`
+		ContactNumber  string `json:"contact_number"`
+		Email		  string `json:"email"`
 		Status         string `json:"status"`
 		CreatedAt      string `json:"created_at"`
 	}
@@ -1173,6 +1220,8 @@ func GetAdoptionApplicationsByPetID(c *fiber.Ctx) error {
 			FirstName:      app.Adopter.FirstName,
 			LastName:       app.Adopter.LastName,
 			Address: 	  app.Adopter.Address,
+			ContactNumber:  app.Adopter.ContactNumber,
+			Email: 		app.Adopter.Email,
 			AdopterProfile: app.Adopter.AdopterMedia.AdopterProfile, // Assuming `AdopterProfile` is the correct field
 			PetName:        app.Pet.PetName,                         // Assuming `PetName` is the pet's name field
 			Status:         app.Status,

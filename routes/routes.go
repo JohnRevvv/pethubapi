@@ -51,13 +51,12 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Get("/users/allpets", controllers.GetAllPets)
 	pethubRoutes.Get("/users/pets/search/all", controllers.FetchAllPets)
 	pethubRoutes.Get("/applications/adopter/:adopter_id", controllers.GetApplicationByAdopterID)
-	pethubRoutes.Get("/applications/pet/:pet_id", controllers.GetAdoptionApplicationsByPetID)
+	pethubRoutes.Get("/applications/pet/:pet_id", controllers.GetAdoptionApplicationsByPetID2)
 	pethubRoutes.Get("/applications/status/:application_id", controllers.GetAdoptionSubmissionStatusByApplicationID)
 	pethubRoutes.Post("/reports/shelter/:shelter_id/adopter/:adopter_id", controllers.SubmitReport)
 	pethubRoutes.Get("/applications/allpets/:adopter_id", controllers.ShowPetsByAdopterID)
 	pethubRoutes.Get("/adopter/:adopter_id/notifications", controllers.GetAdoptionNotifications)
 	
-
 
 	// ---------------- Shelter Routes ----------------
 	app.Post("/shelter/register", controllers.RegisterShelter)
@@ -79,17 +78,16 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Put("/shelter/:id/update/donationinfo", controllers.UpdateShelterDonations)
 	pethubRoutes.Put("/shelter/:id/change-password", controllers.ShelterChangePassword)
 	pethubRoutes.Put("/shelter/:id/pet/update-priority-status", controllers.UpdatePriorityStatus)
-	pethubRoutes.Get("/shelter/:id/adoption-applications", controllers.GetAdoptionApplications)
 	pethubRoutes.Get("/shelter/:application_id/application-details", controllers.GetApplicationByApplicationID)
 	pethubRoutes.Get("/shelterinfo/:shelter_id", controllers.GetShelterInfo)
-	pethubRoutes.Post("/shelter/:shelter_id/add-pet",controllers.AddPetInfo)
+	pethubRoutes.Post("/shelter/:shelter_id/add-pet", controllers.AddPetInfo)
 	pethubRoutes.Get("/shelter/count/:pet_id/applied", controllers.CountApplicantsByPetId)
 
 	pethubRoutes.Get("/shelter/:shelter_id/adoption", controllers.GetPetsWithAdoptionRequestsByShelter)
 	pethubRoutes.Get("/shelter/:pet_id/get/applications", controllers.GetAdoptionApplicationsByPetID)
 	pethubRoutes.Post("/shelter/application/:application_id/set-interview-date", controllers.SetInterviewSchedule)
 	pethubRoutes.Put("/shelter/application/:application_id/interview/reject", controllers.RejectApplication)
-
+	pethubRoutes.Get("/shelter/:shelter_id/adoption-applications", controllers.GetAdoptionSubmissionsByShelterAndStatus)
 
 	// ---------------- General Shared Routes ----------------s
 	pethubRoutes.Get("/allshelter", controllers.GetShelters)
