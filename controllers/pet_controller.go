@@ -62,7 +62,6 @@ func AddPetInfo(c *fiber.Ctx) error {
 		PetSex:          c.FormValue("pet_sex"),
 		PetSize:         c.FormValue("pet_size"),
 		PetDescriptions: c.FormValue("pet_descriptions"),
-		PriorityStatus:  c.FormValue("priority_status") == "1",
 		CreatedAt:       time.Now(),
 	}
 
@@ -527,8 +526,32 @@ func UpdatePriorityStatus(c *fiber.Ctx) error {
 		})
 	}
 
+	// If setting to true, check if limit of 3 is reached
+	if !petInfo.PriorityStatus {
+		var count int64
+		err := middleware.DBConn.Model(&models.PetInfo{}).
+			Where("shelter_id = ? AND priority_status = ?", petInfo.ShelterID, true).
+			Count(&count).Error
+
+		if err != nil {
+			return c.JSON(response.ShelterResponseModel{
+				RetCode: "500",
+				Message: "Database error while counting prioritized pets",
+				Data:    err.Error(),
+			})
+		}
+
+		if count >= 3 {
+			return c.JSON(response.ShelterResponseModel{
+				RetCode: "403",
+				Message: "Maximum of 3 prioritized pets allowed per shelter",
+				Data:    nil,
+			})
+		}
+	}
+
 	// Toggle the priority status
-	petInfo.PriorityStatus = !petInfo.PriorityStatus // Toggle the boolean value
+	petInfo.PriorityStatus = !petInfo.PriorityStatus
 
 	// Update only the priority_status field in the database
 	if err := middleware.DBConn.Model(&petInfo).Update("priority_status", petInfo.PriorityStatus).Error; err != nil {
@@ -545,6 +568,7 @@ func UpdatePriorityStatus(c *fiber.Ctx) error {
 		Data:    petInfo,
 	})
 }
+
 
 func SetPetStatusToArchive(c *fiber.Ctx) error {
 	petID := c.Params("id") // Get pet ID from URL parameter
