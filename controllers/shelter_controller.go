@@ -9,6 +9,7 @@ import (
 	"pethub_api/models"
 	"pethub_api/models/response"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -745,58 +746,43 @@ func GetShelterByName(c *fiber.Ctx) error {
 	})
 }
 
-func GetAdoptionApplications(c *fiber.Ctx) error {
-	shelterID := c.Params("id")
-	status := c.Query("status")
+// new
+func GetAdoptionSubmissionsByShelterAndStatus(c *fiber.Ctx) error {
+	shelterID := c.Params("shelter_id")
+	status := c.Query("status") // Example: ?status=approved
 
-	if status == "" || shelterID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "shelter_id and status are required",
-		})
-	}
-
-	// Create a custom struct just for the response
-	type AdoptionApplicationResponse struct {
-		ApplicationID  uint   `json:"application_id"`
-		FirstName      string `json:"first_name"`
-		LastName       string `json:"last_name"`
-		AdopterProfile string `json:"adopter_profile"`
-		PetName        string `json:"pet_name"`
-		Status         string `json:"status"`
-		CreatedAt      string `json:"created_at"`
-	}
-
-	var applications []models.AdoptionSubmission
-	var responses []AdoptionApplicationResponse
-
-	// Fetch the adoption submissions with related data
-	if err := middleware.DBConn.Debug().
-		Where("shelter_id = ? AND status = ?", shelterID, status).
+	var submissions []models.AdoptionSubmission
+	result := middleware.DBConn.Debug().
 		Preload("Adopter").
-		Preload("Adopter.AdopterMedia"). // Preload adopter media
-		Preload("Pet").                  // Preload pet data
-		Find(&applications).Error; err != nil {
-		return c.JSON(response.ResponseModel{
+		Preload("Adopter.AdopterMedia").
+		Preload("Pet").
+		Preload("Pet.PetMedia").
+		Preload("ScheduleInterview").
+		Where("shelter_id = ? AND status = ?", shelterID, status).
+		Find(&submissions)
+
+	if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error while fetching submissions",
+			Data:    result.Error.Error(),
+		})
+	}
+
+	if len(submissions) == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(response.ShelterResponseModel{
 			RetCode: "404",
-			Message: "Failed to fetch adoption applications",
-			Data:    err.Error(),
+			Message: "No adoption submissions found",
+			Data:    nil,
 		})
 	}
 
-	// Format the response to match the required fields
-	for _, app := range applications {
-		responses = append(responses, AdoptionApplicationResponse{
-			ApplicationID:  app.ApplicationID,
-			FirstName:      app.Adopter.FirstName,
-			LastName:       app.Adopter.LastName,
-			AdopterProfile: app.Adopter.AdopterMedia.AdopterProfile, // Assuming `ProfileURL` is the field for the profile image
-			PetName:        app.Pet.PetName,                         // Assuming `PetName` is the pet's name field
-			Status:         app.Status,
-			CreatedAt:      app.CreatedAt.Format(time.RFC3339), // Format the date as needed
-		})
-	}
-
-	return c.JSON(responses)
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Success",
+		"data": fiber.Map{
+			"submissions": submissions,
+		},
+	})
 }
 
 func GetApplicationByApplicationID(c *fiber.Ctx) error {
@@ -904,6 +890,17 @@ func SetInterviewSchedule(c *fiber.Ctx) error {
 		})
 	}
 
+	// Update pet status to 'pending'
+	if err := middleware.DBConn.Model(&models.PetInfo{}).
+		Where("pet_id = ?", application.PetID).
+		Update("status", "pending").Error; err != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Failed to update pet status",
+			Data:    err,
+		})
+	}
+
 	// Parse JSON input
 	type InterviewInput struct {
 		InterviewDate  string `json:"interview_date"` // Format: YYYY-MM-DD
@@ -958,7 +955,7 @@ func SetInterviewSchedule(c *fiber.Ctx) error {
 
 	return c.JSON(response.ShelterResponseModel{
 		RetCode: "200",
-		Message: "Interview scheduled. Application marked as 'interview'. Others set to 'in queue'.",
+		Message: "Interview scheduled. Application marked as 'interview'. Others set to 'in queue'. Pet status set to 'pending'.",
 		Data:    newInterview,
 	})
 }
@@ -966,6 +963,19 @@ func SetInterviewSchedule(c *fiber.Ctx) error {
 func RejectApplication(c *fiber.Ctx) error {
 	applicationID := c.Params("application_id")
 
+	// Parse incoming JSON body
+	var body struct {
+		ReasonForRejection []string `json:"reason_for_rejection"` // Accept multiple rejection reasons
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "400",
+			Message: "Invalid request body",
+			Data:    err.Error(),
+		})
+	}
+
+	// Fetch the application
 	var application models.AdoptionSubmission
 	result := middleware.DBConn.Debug().Preload("ScheduleInterview").Where("application_id = ?", applicationID).First(&application)
 	if result.Error != nil {
@@ -983,8 +993,13 @@ func RejectApplication(c *fiber.Ctx) error {
 		})
 	}
 
-	// Change the status of this application to 'archived'
-	application.Status = "archived"
+	// Combine reasons into one string (e.g., comma-separated)
+	reasonStr := strings.Join(body.ReasonForRejection, ", ")
+
+	// Set status and reasons
+	application.Status = "rejected"
+	application.ReasonForRejection = reasonStr
+
 	if err := middleware.DBConn.Save(&application).Error; err != nil {
 		return c.JSON(response.ShelterResponseModel{
 			RetCode: "500",
@@ -993,7 +1008,7 @@ func RejectApplication(c *fiber.Ctx) error {
 		})
 	}
 
-	// Change the interview status to 'archived' for this application
+	// Update interview status to 'rejected'
 	if err := middleware.DBConn.Model(&models.ScheduleInterview{}).
 		Where("application_id = ?", applicationID).
 		Update("interview_status", "rejected").Error; err != nil {
@@ -1004,14 +1019,28 @@ func RejectApplication(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check if there are other applications with the same pet_id and status 'in queue'
+	// Update pet status if it's 'pending'
+	var pet models.PetInfo
+	if err := middleware.DBConn.Debug().Where("pet_id = ?", application.PetID).First(&pet).Error; err == nil {
+		if pet.Status == "pending" {
+			pet.Status = "available"
+			if err := middleware.DBConn.Save(&pet).Error; err != nil {
+				return c.JSON(response.ShelterResponseModel{
+					RetCode: "500",
+					Message: "Failed to update pet status",
+					Data:    err,
+				})
+			}
+		}
+	}
+
+	// Update other in-queue applications to pending
 	var count int64
 	middleware.DBConn.Model(&models.AdoptionSubmission{}).
 		Where("pet_id = ? AND application_id != ? AND status = ?", application.PetID, application.ApplicationID, "in queue").
 		Count(&count)
 
 	if count > 0 {
-		// Update other applications status from 'in queue' to 'pending'
 		if err := middleware.DBConn.Model(&models.AdoptionSubmission{}).
 			Where("pet_id = ? AND application_id != ? AND status = ?", application.PetID, application.ApplicationID, "in queue").
 			Update("status", "pending").Error; err != nil {
@@ -1025,8 +1054,91 @@ func RejectApplication(c *fiber.Ctx) error {
 
 	return c.JSON(response.ShelterResponseModel{
 		RetCode: "200",
-		Message: "Application archived. Interview marked as 'archived'. Other in-queue applications set to 'pending'.",
+		Message: "Application rejected. Reasons saved. Interview rejected. Pet and other apps updated.",
 		Data:    application,
+	})
+}
+
+func ApproveApplication(c *fiber.Ctx) error {
+	applicationId := c.Params("application_id")
+
+	var submission models.AdoptionSubmission
+	result := middleware.DBConn.Debug().Where("application_id = ?", applicationId).First(&submission)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return c.JSON(response.ShelterResponseModel{
+				RetCode: "404",
+				Message: "Application not found",
+				Data:    nil,
+			})
+		}
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error while fetching application",
+			Data:    result.Error,
+		})
+	}
+
+	if submission.Status == "interview" {
+		submission.Status = "passed"
+
+		var schedule models.ScheduleInterview
+		if err := middleware.DBConn.Debug().Where("application_id = ?", submission.ApplicationID).First(&schedule).Error; err == nil {
+			schedule.InterviewStatus = "passed"
+			if err := middleware.DBConn.Save(&schedule).Error; err != nil {
+				return c.JSON(response.ShelterResponseModel{
+					RetCode: "500",
+					Message: "Failed to update interview status",
+					Data:    err,
+				})
+			}
+		}
+	} else if submission.Status == "passed" {
+		submission.Status = "adopted"
+
+		var pet models.PetInfo
+		if err := middleware.DBConn.Debug().Where("pet_id = ?", submission.PetID).First(&pet).Error; err == nil {
+			pet.Status = "adopted"
+			if err := middleware.DBConn.Save(&pet).Error; err != nil {
+				return c.JSON(response.ShelterResponseModel{
+					RetCode: "500",
+					Message: "Failed to update pet status",
+					Data:    err,
+				})
+			}
+		}
+
+		// Update other applications for the same pet
+		var otherApplications []models.AdoptionSubmission
+		err := middleware.DBConn.Debug().
+			Where("pet_id = ? AND status = ?", submission.PetID, "in queue").
+			Find(&otherApplications).Error
+		if err == nil {
+			for _, app := range otherApplications {
+				app.Status = "unsuccessful"
+				middleware.DBConn.Save(&app)
+			}
+		}
+	} else {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "400",
+			Message: "Status can't be updated from current state",
+			Data:    nil,
+		})
+	}
+
+	if err := middleware.DBConn.Save(&submission).Error; err != nil {
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Failed to update application status",
+			Data:    err,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(response.ShelterResponseModel{
+		RetCode: "200",
+		Message: "Application status updated successfully",
+		Data:    submission,
 	})
 }
 
@@ -1042,10 +1154,11 @@ func CountPetsByShelter(c *fiber.Ctx) error {
 	}
 
 	var available, unavailable, adopted int64
+	var petInfo models.PetInfo
 
-	middleware.DBConn.Debug().Model(&models.PetInfo{}).Where("shelter_id = ? AND status = ?", shelterID, "available").Count(&available)
-	middleware.DBConn.Debug().Model(&models.PetInfo{}).Where("shelter_id = ? AND status = ?", shelterID, "unavailable").Count(&unavailable)
-	middleware.DBConn.Debug().Model(&models.PetInfo{}).Where("shelter_id = ? AND status = ?", shelterID, "adopted").Count(&adopted)
+	middleware.DBConn.Debug().Model(&petInfo).Where("shelter_id = ? AND status = ?", shelterID, "available").Count(&available)
+	middleware.DBConn.Debug().Model(&petInfo).Where("shelter_id = ? AND status = ?", shelterID, "unavailable").Count(&unavailable)
+	middleware.DBConn.Debug().Model(&petInfo).Where("shelter_id = ? AND status = ?", shelterID, "adopted").Count(&adopted)
 
 	return c.Status(200).JSON(fiber.Map{
 		"message": "Counts fetched successfully",
@@ -1087,9 +1200,9 @@ func GetPetsWithAdoptionRequestsByShelter(c *fiber.Ctx) error {
 
 	var submissions []models.AdoptionSubmission
 
-	// Fetch submissions for a specific shelter and preload the Pet
 	result := middleware.DBConn.Debug().
-		Where("shelter_id = ?", shelterID).
+		Joins("JOIN petinfo ON petinfo.pet_id = adoption_submissions.pet_id").
+		Where("adoption_submissions.shelter_id = ? AND petinfo.status = ? AND adoption_submissions.status = ?", shelterID, "available", "pending").
 		Preload("Pet").
 		Preload("Pet.PetMedia").
 		Find(&submissions)
@@ -1102,7 +1215,7 @@ func GetPetsWithAdoptionRequestsByShelter(c *fiber.Ctx) error {
 		})
 	}
 
-	// Remove duplicate pets using a map
+	// Remove duplicate pets
 	petMap := make(map[uint]models.PetInfo)
 	for _, sub := range submissions {
 		if sub.Pet.PetID != 0 {
@@ -1111,7 +1224,7 @@ func GetPetsWithAdoptionRequestsByShelter(c *fiber.Ctx) error {
 	}
 
 	// Convert map to slice
-	var pets []models.PetInfo
+	pets := make([]models.PetInfo, 0)
 	for _, pet := range petMap {
 		pets = append(pets, pet)
 	}
@@ -1141,6 +1254,8 @@ func GetAdoptionApplicationsByPetID(c *fiber.Ctx) error {
 		AdopterProfile string `json:"adopter_profile"`
 		PetName        string `json:"pet_name"`
 		Address        string `json:"address"`
+		ContactNumber  string `json:"contact_number"`
+		Email          string `json:"email"`
 		Status         string `json:"status"`
 		CreatedAt      string `json:"created_at"`
 	}
@@ -1172,6 +1287,8 @@ func GetAdoptionApplicationsByPetID(c *fiber.Ctx) error {
 			FirstName:      app.Adopter.FirstName,
 			LastName:       app.Adopter.LastName,
 			Address:        app.Adopter.Address,
+			ContactNumber:  app.Adopter.ContactNumber,
+			Email:          app.Adopter.Email,
 			AdopterProfile: app.Adopter.AdopterMedia.AdopterProfile, // Assuming `AdopterProfile` is the correct field
 			PetName:        app.Pet.PetName,                         // Assuming `PetName` is the pet's name field
 			Status:         app.Status,

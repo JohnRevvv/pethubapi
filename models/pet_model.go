@@ -16,7 +16,7 @@ type PetInfo struct {
 	PetSize         string    `json:"pet_size"`
 	PriorityStatus  bool      `json:"priority_status"`
 
-	PetMedia PetMedia `gorm:"foreignKey:PetID;references:PetID" json:"petmedia"`
+	PetMedia *PetMedia `gorm:"foreignKey:PetID;references:PetID" json:"petmedia"`
 }
 
 func (PetInfo) TableName() string {
@@ -24,7 +24,7 @@ func (PetInfo) TableName() string {
 }
 
 type PetMedia struct {
-	PetID      uint   `gorm:"not null" json:"pet_id"`
+	PetID      uint   `gorm:"primaryKey" json:"pet_id"`
 	PetImage1  string `json:"pet_image1"`  // Base64-encoded image
 	PetVaccine string `json:"pet_vaccine"` // Base64-encoded image
 }

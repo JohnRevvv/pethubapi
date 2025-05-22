@@ -4,13 +4,14 @@ import "time"
 
 // ShelterAccount model (linked to existing "shelteraccount" table)
 type ShelterAccount struct {
-	ShelterID   uint   `gorm:"primaryKey" json:"shelter_id"`
-	Username    string `gorm:"unique;not null" json:"username"`
-	Password    string `json:"password"`
-	Status      string `gorm:"default:'active'" json:"status"` // Add this line
-	RegStatus   string `json:"reg_status"`
-	CreatedAt   time.Time
-	ShelterInfo ShelterInfo `gorm:"foreignKey:ShelterID;json:"shelterinfo"`
+	ShelterID uint   `gorm:"primaryKey" json:"shelter_id"`
+	Username  string `gorm:"unique;not null" json:"username"`
+	Password  string `json:"password"`
+	Status    string `gorm:"default:'active'" json:"status"` // Add this line
+	RegStatus string `json:"reg_status"`
+	CreatedAt time.Time
+
+	// ShelterInfo ShelterInfo `gorm:"foreignKey:ShelterID;json:"shelterinfo"`
 }
 
 // TableName overrides default table name

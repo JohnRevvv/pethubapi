@@ -25,6 +25,7 @@ type AdoptionSubmission struct {
 	InterviewSetting    string `json:"interview_setting"`
 	ImageID             uint   `json:"image_id"`
 	Status              string `json:"status" gorm:"type:varchar(20);default:'pending'"`
+	ReasonForRejection  string `json:"reason_for_rejection"`
 	CreatedAt           time.Time
 
 	Adopter           AdopterInfo       `json:"adopter"`

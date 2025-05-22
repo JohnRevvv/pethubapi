@@ -11,7 +11,6 @@ type AdopterAccount struct {
 	Password  string `json:"password"`
 	Status    string `gorm:"default:'active'" json:"status"` // Add this line
 	CreatedAt time.Time
-	//Info      AdopterInfo `gorm:"foreignKey:AdopterID;constraint:OnDelete:CASCADE" json:"info"`
 }
 
 // TableName overrides default table name
@@ -32,6 +31,7 @@ type AdopterInfo struct {
 	Occupation    string       `json:"occupation"`
 	CivilStatus   string       `json:"civil_status"`
 	SocialMedia   string       `json:"social_media"`
+	
 	AdopterMedia  AdopterMedia `gorm:"foreignKey:AdopterID;references:AdopterID" json:"adoptermedia"`
 }
 

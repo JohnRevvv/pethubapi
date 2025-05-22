@@ -202,9 +202,9 @@ func ShelterResetPassword(c *fiber.Ctx) error {
 	})
 }
 
-//*****************************************************************************
-//******************************** ADOPTER ************************************
-//*****************************************************************************
+// *****************************************************************************
+// ******************************** ADOPTER ************************************
+// *****************************************************************************
 // ForgotPassword - step 1
 func AdopterForgotPassword(c *fiber.Ctx) error {
 	type Request struct {
@@ -215,8 +215,8 @@ func AdopterForgotPassword(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid request"})
 	}
 
-	var shelterInfo models.ShelterInfo
-	result := middleware.DBConn.Where("email = ?", req.Email).First(&shelterInfo)
+	var adopterInfo models.AdopterInfo
+	result := middleware.DBConn.Where("email = ?", req.Email).First(&adopterInfo)
 	if result.Error == gorm.ErrRecordNotFound {
 		return c.Status(fiber.StatusNotFound).JSON(response.ResponseModel{
 			RetCode: "404", Message: "Email not found",
@@ -313,8 +313,8 @@ func AdopterResetPassword(c *fiber.Ctx) error {
 		})
 	}
 
-	var shelterInfo models.ShelterInfo
-	if err := middleware.DBConn.Where("email = ?", req.Email).First(&shelterInfo).Error; err != nil {
+	var adopterInfo models.AdopterInfo
+	if err := middleware.DBConn.Where("email = ?", req.Email).First(&adopterInfo).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(response.ResponseModel{
 			RetCode: "404", Message: "User not found",
 		})
@@ -327,8 +327,8 @@ func AdopterResetPassword(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := middleware.DBConn.Model(&models.ShelterAccount{}).
-		Where("adopter_id = ?", shelterInfo.ShelterID).
+	if err := middleware.DBConn.Model(&models.AdopterAccount{}).
+		Where("adopter_id = ?", adopterInfo.AdopterID).
 		Update("password", string(hashedPwd)).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(response.ResponseModel{
 			RetCode: "500",
