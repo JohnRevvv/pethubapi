@@ -60,8 +60,10 @@ func RegisterShelter(c *fiber.Ctx) error {
 	}{}
 
 	if err := c.BodyParser(&requestBody); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Invalid request body",
+		return c.Status(fiber.StatusBadRequest).JSON(response.ShelterResponseModel{
+			RetCode: "400",
+			Message: "Invalid request body",
+			Data:    nil,
 		})
 	}
 
@@ -95,11 +97,10 @@ func RegisterShelter(c *fiber.Ctx) error {
 	// Create shelter account
 	ShelterAccount := models.ShelterAccount{
 		Username:  requestBody.Username,
-		Password:  string(hashedPassword), // Store hashed password
+		Password:  string(hashedPassword),
 		CreatedAt: time.Now(),
 	}
 
-	// Insert into shelteraccount and get the generated ShelterID
 	if err := middleware.DBConn.Create(&ShelterAccount).Error; err != nil {
 		return c.JSON(response.ShelterResponseModel{
 			RetCode: "500",
@@ -110,7 +111,7 @@ func RegisterShelter(c *fiber.Ctx) error {
 
 	// Create shelter info
 	ShelterInfo := models.ShelterInfo{
-		ShelterID:          ShelterAccount.ShelterID, // Link the ShelterInfo to ShelterAccount
+		ShelterID:          ShelterAccount.ShelterID,
 		ShelterName:        requestBody.ShelterName,
 		ShelterAddress:     requestBody.ShelterAddress,
 		ShelterLandmark:    requestBody.ShelterLandmark,
@@ -121,7 +122,6 @@ func RegisterShelter(c *fiber.Ctx) error {
 		ShelterSocial:      requestBody.ShelterSocial,
 	}
 
-	// Insert into Shelterinfo
 	if err := middleware.DBConn.Create(&ShelterInfo).Error; err != nil {
 		return c.JSON(response.ShelterResponseModel{
 			RetCode: "500",
@@ -130,9 +130,10 @@ func RegisterShelter(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Shelter registered successfully",
-		"data": fiber.Map{
+	return c.Status(fiber.StatusCreated).JSON(response.ShelterResponseModel{
+		RetCode: "200",
+		Message: "Shelter registered successfully",
+		Data: fiber.Map{
 			"shelter": ShelterAccount,
 			"info":    ShelterInfo,
 		},
@@ -746,7 +747,7 @@ func GetShelterByName(c *fiber.Ctx) error {
 	})
 }
 
-//new
+// new
 func GetAdoptionSubmissionsByShelterAndStatus(c *fiber.Ctx) error {
 	shelterID := c.Params("shelter_id")
 	status := c.Query("status") // Example: ?status=approved
@@ -794,6 +795,8 @@ func GetApplicationByApplicationID(c *fiber.Ctx) error {
 		Preload("Adopter.AdopterMedia").
 		Preload("Pet").
 		Preload("Pet.PetMedia").
+		Preload("Shelter").
+		Preload("Shelter.ShelterMedia").
 		First(&adoptionSubmission)
 
 	if infoResult.Error != nil {
@@ -903,8 +906,8 @@ func SetInterviewSchedule(c *fiber.Ctx) error {
 
 	// Parse JSON input
 	type InterviewInput struct {
-		InterviewDate  string `json:"interview_date"`  // Format: YYYY-MM-DD
-		InterviewTime  string `json:"interview_time"`  // Format: HH:MM:SS
+		InterviewDate  string `json:"interview_date"` // Format: YYYY-MM-DD
+		InterviewTime  string `json:"interview_time"` // Format: HH:MM:SS
 		InterviewNotes string `json:"interview_notes"`
 	}
 
@@ -952,7 +955,6 @@ func SetInterviewSchedule(c *fiber.Ctx) error {
 			Data:    err,
 		})
 	}
-
 
 	return c.JSON(response.ShelterResponseModel{
 		RetCode: "200",
@@ -1256,7 +1258,7 @@ func GetAdoptionApplicationsByPetID(c *fiber.Ctx) error {
 		PetName        string `json:"pet_name"`
 		Address        string `json:"address"`
 		ContactNumber  string `json:"contact_number"`
-		Email		  string `json:"email"`
+		Email          string `json:"email"`
 		Status         string `json:"status"`
 		CreatedAt      string `json:"created_at"`
 	}
@@ -1287,9 +1289,9 @@ func GetAdoptionApplicationsByPetID(c *fiber.Ctx) error {
 			ApplicationID:  app.ApplicationID,
 			FirstName:      app.Adopter.FirstName,
 			LastName:       app.Adopter.LastName,
-			Address: 	  app.Adopter.Address,
+			Address:        app.Adopter.Address,
 			ContactNumber:  app.Adopter.ContactNumber,
-			Email: 		app.Adopter.Email,
+			Email:          app.Adopter.Email,
 			AdopterProfile: app.Adopter.AdopterMedia.AdopterProfile, // Assuming `AdopterProfile` is the correct field
 			PetName:        app.Pet.PetName,                         // Assuming `PetName` is the pet's name field
 			Status:         app.Status,
@@ -1297,5 +1299,60 @@ func GetAdoptionApplicationsByPetID(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(responses)
+	return c.JSON(response.ShelterResponseModel{
+		RetCode: "200",
+		Message: "Success",
+		Data:    responses,
+	})
 }
+
+func GetInfosForDownloadLetter(c *fiber.Ctx) error {
+	applicationIDParam := c.Params("application_id")
+
+	// Check if parameters are provided
+	if applicationIDParam == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "shelter_id and application_id are required",
+		})
+	}
+
+	applicationID, err := strconv.Atoi(applicationIDParam)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid application_id format",
+		})
+	}
+
+	var application models.AdoptionSubmission
+	result := middleware.DBConn.Debug().
+		Preload("Adopter").
+		Preload("Pet").
+		Preload("Shelter").
+		Preload("Shelter.ShelterMedia").
+		Where("application_id = ?", applicationID).
+		First(&application)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return c.JSON(response.ShelterResponseModel{
+				RetCode: "404",
+				Message: "Application not found",
+				Data:    nil,
+			})
+		}
+		return c.JSON(response.ShelterResponseModel{
+			RetCode: "500",
+			Message: "Database error while fetching application",
+			Data:    result.Error,
+		})
+	}
+
+	return c.JSON(response.ShelterResponseModel{
+		RetCode: "200",
+		Message: "Success",
+		Data: fiber.Map{
+			"application": application,
+		},
+	})
+}
+

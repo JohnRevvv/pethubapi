@@ -530,7 +530,7 @@ func UpdatePriorityStatus(c *fiber.Ctx) error {
 	if !petInfo.PriorityStatus {
 		var count int64
 		err := middleware.DBConn.Model(&models.PetInfo{}).
-			Where("shelter_id = ? AND priority_status = ?", petInfo.ShelterID, true).
+			Where("shelter_id = ? AND status = ? AND priority_status = ?", petInfo.ShelterID, "available", true).
 			Count(&count).Error
 
 		if err != nil {
@@ -568,7 +568,6 @@ func UpdatePriorityStatus(c *fiber.Ctx) error {
 		Data:    petInfo,
 	})
 }
-
 
 func SetPetStatusToArchive(c *fiber.Ctx) error {
 	petID := c.Params("id") // Get pet ID from URL parameter

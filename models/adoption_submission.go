@@ -6,28 +6,30 @@ import (
 
 type AdoptionSubmission struct {
 	// Application Info
-	ApplicationID       uint   `json:"application_id" gorm:"primaryKey;autoIncrement"`
-	ShelterID           uint   `json:"shelter_id"`
-	PetID               uint   `json:"pet_id"`
-	AdopterID           uint   `json:"adopter_id"`
-	AltFName            string `json:"alt_f_name" gorm:"not null"`
-	AltLName            string `json:"alt_l_name" gorm:"not null"`
-	Relationship        string `json:"relationship" gorm:"not null"`
-	AltContactNumber    string `json:"alt_contact_number" gorm:"not null"`
-	AltEmail            string `json:"alt_email" gorm:"not null"`
-	ReasonForAdoption   string `json:"reason_for_adoption" gorm:"not null"`
-	IdealPetDescription string `json:"ideal_pet_description"`
-	HousingSituation    string `json:"housing_situation" gorm:"not null"`
-	PetsAtHome          string `json:"pets_at_home"`
-	Allergies           string `json:"allergies"`
-	FamilySupport       string `json:"family_support"`
-	PastPets            string `json:"past_pets"`
-	InterviewSetting    string `json:"interview_setting"`
-	ImageID             uint   `json:"image_id"`
-	Status              string `json:"status" gorm:"type:varchar(20);default:'pending'"`
-	ReasonForRejection string `json:"reason_for_rejection"`
-	CreatedAt           time.Time
+	ApplicationID       uint      `json:"application_id" gorm:"primaryKey;autoIncrement"`
+	ShelterID           uint      `json:"shelter_id"`
+	PetID               uint      `json:"pet_id"`
+	AdopterID           uint      `json:"adopter_id"`
+	AltFName            string    `json:"alt_f_name" gorm:"not null"`
+	AltLName            string    `json:"alt_l_name" gorm:"not null"`
+	Relationship        string    `json:"relationship" gorm:"not null"`
+	AltContactNumber    string    `json:"alt_contact_number" gorm:"not null"`
+	AltEmail            string    `json:"alt_email" gorm:"not null"`
+	ReasonForAdoption   string    `json:"reason_for_adoption" gorm:"not null"`
+	IdealPetDescription string    `json:"ideal_pet_description"`
+	HousingSituation    string    `json:"housing_situation" gorm:"not null"`
+	PetsAtHome          string    `json:"pets_at_home"`
+	Allergies           string    `json:"allergies"`
+	FamilySupport       string    `json:"family_support"`
+	PastPets            string    `json:"past_pets"`
+	InterviewSetting    string    `json:"interview_setting"`
+	ImageID             uint      `json:"image_id"`
+	Status              string    `json:"status" gorm:"type:varchar(20);default:'pending'"`
+	ReasonForRejection  string    `json:"reason_for_rejection"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 
+	Shelter           ShelterInfo       `gorm:"foreignKey:ShelterID;references:ShelterID"  json:"shelter"`
 	Adopter           AdopterInfo       `json:"adopter"`
 	Pet               PetInfo           `json:"pet"`
 	ScheduleInterview ScheduleInterview `gorm:"foreignKey:ApplicationID;references:ApplicationID"  json:"scheduleinterview"`
@@ -69,7 +71,7 @@ type ScheduleInterview struct {
 	InterviewTime   string    `json:"interview_time"`
 	InterviewNotes  string    `json:"interview_notes"`
 	InterviewStatus string    `json:"interview_status" gorm:"type:varchar(20);default:'scheduled'"`
-	CreatedAt       time.Time    `json:"created_at"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 func (ScheduleInterview) TableName() string {
