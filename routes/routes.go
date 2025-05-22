@@ -37,9 +37,10 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Put("/users/:id/update-info", controllers.UpdateAdopterDetails)
 	pethubRoutes.Post("/users/:id/upload-media", controllers.UploadAdopterMedia)
 	pethubRoutes.Get("/adopter/:id", controllers.GetAdopterProfile)
-	pethubRoutes.Put("/adopter/:id", controllers.EditAdopterProfile)
+	pethubRoutes.Post("/adopter/:adopter_id/edit", controllers.EditAdopterProfile)
 	pethubRoutes.Post("/adopter/:shelter_id/:pet_id/:adopter_id/adoption", controllers.CreateAdoption)
 	pethubRoutes.Get("/adopter/profile/:adopter_id", controllers.GetAdopterInfoByID)
+	pethubRoutes.Get("/adopter/get/:shelter_id/other-pets", controllers.GetOtherPetsByAdopterID)
 
 	// Adopter - Pet Related
 	pethubRoutes.Get("/users/petinfo", controllers.GetAllPets)
@@ -49,7 +50,16 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Get("/users/priority/", controllers.GetPetsWithTrueStatus)
 	pethubRoutes.Get("/users/allpets", controllers.GetAllPets)
 	pethubRoutes.Get("/users/pets/search/all", controllers.FetchAllPets)
-
+	pethubRoutes.Get("/applications/adopter/:application_id", controllers.GetApplicationByAdopterID)
+	pethubRoutes.Get("/applications/pet/:pet_id", controllers.GetAdoptionApplicationsByPetID2)
+	pethubRoutes.Get("/applications/status/:application_id", controllers.GetAdoptionSubmissionStatusByApplicationID)
+	pethubRoutes.Post("/reports/shelter/:shelter_id/adopter/:adopter_id", controllers.SubmitReport)
+	pethubRoutes.Get("/applications/allpets/:adopter_id", controllers.ShowPetsByAdopterID)
+	pethubRoutes.Get("/adopter/:adopter_id/notifications", controllers.GetAdoptionNotifications)
+	pethubRoutes.Get("/adopter/:adopter_id/notifications/unread_count", controllers.CountUnreadNotifications)
+	pethubRoutes.Patch("/adopter/notifications/:id/read-status", controllers.SetNotificationReadStatus)
+	pethubRoutes.Get("/adopter/notifications/:id", controllers.GetNotificationByID)
+	pethubRoutes.Delete("/adopter/notifications/:id/remove", controllers.DeleteNotification)
 	// ---------------- Shelter Routes ----------------
 	app.Post("/shelter/register", controllers.RegisterShelter)
 	app.Post("/shelter/login", controllers.LoginShelter)
@@ -58,7 +68,7 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Get("/shelter/:id", controllers.GetShelterInfoByID)
 	pethubRoutes.Put("/shelter/:id/update-info", controllers.UpdateShelterDetails)
 	pethubRoutes.Post("/shelter/:id/upload-media", controllers.UploadShelterMedia)
-	// pethubRoutes.Post("/shelter/:id/add-pet-info", controllers.AddPetInfo)
+	pethubRoutes.Get("/shelter/:shelter_id/refined", controllers.GetShelterDetailsRefined)
 	pethubRoutes.Get("/shelter/:id/petinfo", controllers.GetPetInfoByPetID)
 	pethubRoutes.Put("/shelter/:id/update-pet-info", controllers.UpdatePetInfo)
 	pethubRoutes.Put("/shelter/:id/archive-pet", controllers.SetPetStatusToArchive)
@@ -74,8 +84,12 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Get("/shelter/:application_id/application-details", controllers.GetApplicationByApplicationID)
 	pethubRoutes.Get("/shelterinfo/:shelter_id", controllers.GetShelterInfo)
 	pethubRoutes.Post("/shelter/:shelter_id/add-pet", controllers.AddPetInfo)
-	pethubRoutes.Put("/shelter/application/:application_id/interview", controllers.SetInterviewTime)        // Set interview time for approved submission
-	pethubRoutes.Put("/shelter/application/:application_id/:action", controllers.ReviewAdoptionApplication) // Approve or disapprove adoption application
+	pethubRoutes.Get("/shelter/count/:pet_id/applied", controllers.CountApplicantsByPetId)
+
+	pethubRoutes.Get("/shelter/:shelter_id/adoption", controllers.GetPetsWithAdoptionRequestsByShelter)
+	pethubRoutes.Get("/shelter/:pet_id/get/applications", controllers.GetAdoptionApplicationsByPetID)
+	pethubRoutes.Post("/shelter/application/:application_id/set-interview-date", controllers.SetInterviewSchedule)
+	pethubRoutes.Put("/shelter/application/:application_id/interview/reject", controllers.RejectApplication)
 
 	// ---------------- General Shared Routes ----------------s
 	pethubRoutes.Get("/allshelter", controllers.GetShelters)

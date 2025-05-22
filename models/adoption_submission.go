@@ -26,8 +26,10 @@ type AdoptionSubmission struct {
 	ImageID             uint   `json:"image_id"`
 	Status              string `json:"status" gorm:"type:varchar(20);default:'pending'"`
 	CreatedAt           time.Time
-	Adopter             AdopterInfo `json:"adopter"`
-	Pet                 PetInfo     `json:"pet"`
+
+	Adopter           AdopterInfo       `json:"adopter"`
+	Pet               PetInfo           `json:"pet"`
+	ScheduleInterview ScheduleInterview `gorm:"foreignKey:ApplicationID;references:ApplicationID"  json:"scheduleinterview"`
 }
 
 // TableName overrides default table name
@@ -53,4 +55,22 @@ type ApplicationPhotos struct {
 }
 
 // TableName overrides (both map to the same table)
-func (ApplicationPhotos) TableName() string { return "application_photos" }
+func (ApplicationPhotos) TableName() string {
+	return "application_photos"
+}
+
+type ScheduleInterview struct {
+	InterviewID     uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	ApplicationID   uint      `json:"application_id"`
+	ShelterID       uint      `json:"shelter_id"`
+	AdopterID       uint      `json:"adopter_id"`
+	InterviewDate   time.Time `json:"interview_date"`
+	InterviewTime   string    `json:"interview_time"`
+	InterviewNotes  string    `json:"interview_notes"`
+	InterviewStatus string    `json:"interview_status" gorm:"type:varchar(20);default:'scheduled'"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+func (ScheduleInterview) TableName() string {
+	return "schedule_interview"
+}

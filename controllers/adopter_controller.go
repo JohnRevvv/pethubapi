@@ -3,13 +3,14 @@ package controllers
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io/ioutil"
-	"strconv"
-	"time"
-
+	"log"
 	"pethub_api/middleware"
 	"pethub_api/models"
 	"pethub_api/models/response"
+	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
@@ -534,5 +535,180 @@ func CreateAdoption(c *fiber.Ctx) error {
 	return c.Status(201).JSON(fiber.Map{
 		"message":  "Adoption submitted successfully",
 		"adoption": adoption,
+	})
+}
+func GetAdoptionNotifications(c *fiber.Ctx) error {
+	adopterID := c.Params("adopter_id")
+
+	// Step 1: Fetch adoption applications for this adopter
+	var applications []models.AdoptionSubmission
+	if err := middleware.DBConn.Preload("Pet").Where("adopter_id = ?", adopterID).Order("created_at DESC").Find(&applications).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch adoption applications",
+		})
+	}
+
+	// Step 2: For each application, create a new notification if needed (e.g., new status)
+	for _, app := range applications {
+		// Compose notification message
+		msg := fmt.Sprintf("Your adoption application for %s is now '%s'.", app.Pet.PetName, app.Status)
+
+		// Check if a notification for this adopter, pet, and status already exists
+		var existingNotif models.Notification
+		err := middleware.DBConn.
+			Where("adopter_id = ? AND status = ? AND message = ?", app.AdopterID, app.Status, msg).
+			First(&existingNotif).Error
+		if err == nil {
+			// Notification already exists, skip creating a new one
+			continue
+		}
+
+		// Create a new notification record
+		newNotification := models.Notification{
+			AdopterID: app.AdopterID,
+			Title:     "Adoption Application Update",
+			Message:   msg,
+			Type:      "adoption_status",
+			Status:    app.Status,
+			IsRead:    false,
+			CreatedAt: app.CreatedAt,
+		}
+
+		// Save the notification, log error but continue
+		if err := middleware.DBConn.Create(&newNotification).Error; err != nil {
+			log.Println("Error creating notification:", err)
+		}
+	}
+
+	// Step 3: Fetch all notifications for the adopter to return
+	var notifications []models.Notification
+	if err := middleware.DBConn.
+		Where("adopter_id = ?", adopterID).
+		Order("created_at DESC").
+		Find(&notifications).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch notifications",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"notifications": notifications,
+	})
+}
+
+func SetNotificationReadStatus(c *fiber.Ctx) error {
+	notificationID := c.Params("id")
+
+	var body struct {
+		IsRead bool `json:"is_read"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	var notif models.Notification
+	if err := middleware.DBConn.First(&notif, notificationID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Notification not found",
+		})
+	}
+
+	notif.IsRead = body.IsRead
+	if err := middleware.DBConn.Save(&notif).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update notification",
+		})
+	}
+
+	status := "read"
+	if !body.IsRead {
+		status = "unread"
+	}
+	return c.JSON(fiber.Map{
+		"message": fmt.Sprintf("Notification marked as %s", status),
+	})
+}
+
+func CountUnreadNotifications(c *fiber.Ctx) error {
+	adopterID := c.Params("adopter_id")
+
+	var count int64
+	if err := middleware.DBConn.Model(&models.Notification{}).
+		Where("adopter_id = ? AND is_read = false", adopterID).
+		Count(&count).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to count unread notifications",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"unread_count": count,
+	})
+}
+
+func GetNotificationByID(c *fiber.Ctx) error {
+	notificationID := c.Params("id")
+
+	var notif models.Notification
+	if err := middleware.DBConn.First(&notif, notificationID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Notification not found",
+		})
+	}
+
+	// Mark as read if not already
+	if !notif.IsRead {
+		notif.IsRead = true
+		if err := middleware.DBConn.Save(&notif).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to mark notification as read",
+			})
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"notification": notif,
+	})
+}
+
+func DeleteNotification(c *fiber.Ctx) error {
+	notificationID := c.Params("id")
+
+	if err := middleware.DBConn.Delete(&models.Notification{}, notificationID).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to delete notification",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Notification deleted successfully",
+	})
+}
+func GetOtherPetsByAdopterID(c *fiber.Ctx) error {
+	shelterID := c.Params("shelter_id")
+
+	var petInfo []models.PetInfo
+	PetResult := middleware.DBConn.Debug().Preload("PetMedia").Where("shelter_id = ? AND status = ?", shelterID, "available").Find(&petInfo)
+	if errors.Is(PetResult.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "404",
+			Message: "Pets not found",
+			Data:    nil,
+		})
+	} else if PetResult.Error != nil {
+		return c.JSON(response.AdopterResponseModel{
+			RetCode: "500",
+			Message: "Database error",
+			Data:    nil,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Shelter and pets retrieved successfully",
+		"data": fiber.Map{
+			"pets": petInfo,
+		},
 	})
 }
