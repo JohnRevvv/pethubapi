@@ -156,7 +156,7 @@ func GetAllSheltersByID(c *fiber.Ctx) error {
 
 func GetAllShelters(c *fiber.Ctx) error {
 	var AllShelters []models.ShelterAccount
-	result := middleware.DBConn.Debug().Preload("ShelterInfo.ShelterMedia").Where("reg_status = ? AND status = ?", "approved", "active").Find(&AllShelters)
+	result := middleware.DBConn.Debug().Preload("ShelterInfo").Preload("ShelterInfo.ShelterMedia").Where("reg_status = ? AND status = ?", "approved", "active").Find(&AllShelters)
 
 	if result.Error != nil {
 		return c.JSON(response.AdopterResponseModel{
@@ -683,6 +683,7 @@ func ShowPetsByAdopterID(c *fiber.Ctx) error {
 		PetImage      string `json:"pet_image1"`
 		PetName       string `json:"pet_name"`
 		ShelterName   string `json:"shelter_name"`
+		Status        string `json:"status"`
 	}
 
 	var submissions []models.AdoptionSubmission
@@ -725,11 +726,73 @@ func ShowPetsByAdopterID(c *fiber.Ctx) error {
 			PetImage:      petMedia.PetImage1,
 			PetName:       pet.PetName,
 			ShelterName:   shelter.ShelterName,
+			Status:        submission.Status,
 		})
 	}
 
 	return c.JSON(fiber.Map{
 		"message": "Adopted pets retrieved successfully",
 		"data":    results,
+	})
+}
+
+func CheckApplicationExists(c *fiber.Ctx) error {
+	petIdStr := c.Query("petId")
+	adopterIdStr := c.Query("adopterId")
+
+	if petIdStr == "" || adopterIdStr == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "petId and adopterId query parameters are required",
+		})
+	}
+
+	// Convert to uint
+	petId, err := strconv.ParseUint(petIdStr, 10, 32)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid petId parameter",
+		})
+	}
+
+	adopterId, err := strconv.ParseUint(adopterIdStr, 10, 32)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid adopterId parameter",
+		})
+	}
+
+	// Query all submissions
+	var submissions []models.AdoptionSubmission
+	result := middleware.DBConn.Find(&submissions)
+	if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": result.Error.Error(),
+		})
+	}
+
+	petExists := false
+	adopterExists := false
+	petAndAdopterMatch := false
+	var matchedApplicationID uint = 0
+
+	for _, submission := range submissions {
+		if submission.PetID == uint(petId) {
+			petExists = true
+		}
+		if submission.AdopterID == uint(adopterId) {
+			adopterExists = true
+			if submission.PetID == uint(petId) {
+				petAndAdopterMatch = true
+				matchedApplicationID = submission.ApplicationID
+			}
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"pet_exists":      petExists,
+		"adopter_exists":  adopterExists,
+		"pet_and_adopter": petAndAdopterMatch,
+		"application_id":  matchedApplicationID,
+		"all_submissions": submissions,
 	})
 }

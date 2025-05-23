@@ -29,7 +29,7 @@ type AdoptionSubmission struct {
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 
-	Shelter           ShelterInfo       `gorm:"foreignKey:ShelterID;references:ShelterID"  json:"shelter"`
+	Shelter           ShelterInfo       `json:"shelter"`
 	Adopter           AdopterInfo       `json:"adopter"`
 	Pet               PetInfo           `json:"pet"`
 	ScheduleInterview ScheduleInterview `gorm:"foreignKey:ApplicationID;references:ApplicationID"  json:"scheduleinterview"`

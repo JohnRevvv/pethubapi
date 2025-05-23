@@ -11,7 +11,7 @@ type ShelterAccount struct {
 	RegStatus string `json:"reg_status"`
 	CreatedAt time.Time
 
-	// ShelterInfo ShelterInfo `gorm:"foreignKey:ShelterID;json:"shelterinfo"`
+	ShelterInfo ShelterInfo `gorm:"foreignKey:ShelterID" json:"shelterinfo"`
 }
 
 // TableName overrides default table name
