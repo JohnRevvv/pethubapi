@@ -3,6 +3,7 @@ package models
 import "time"
 
 type PetInfo struct {
+	
 	PetID           uint      `gorm:"primaryKey" json:"pet_id"`
 	ShelterID       uint      `gorm:"autoIncrement:false" json:"shelter_id"`
 	PetType         string    `json:"pet_type"`
@@ -13,6 +14,7 @@ type PetInfo struct {
 	PetDescriptions string    `json:"pet_descriptions"`
 	Status          string    `gorm:"default:'available'" json:"status"`
 	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 	PetSize         string    `json:"pet_size"`
 	PriorityStatus  bool      `json:"priority_status"`
 

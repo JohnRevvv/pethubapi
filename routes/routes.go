@@ -19,9 +19,6 @@ func AppRoutes(app *fiber.App) {
 	app.Post("/admin/updateregstatus", controllers.UpdateRegistrationStatus)
 	app.Post("/admin/updateshelterstatus", controllers.UpdateShelterStatus)
 	app.Post("/admin/updateadopterstatus", controllers.UpdateAdopterStatus)
-	//try
-	//app.Get("/admin/getallshelterstry", controllers.GetAllSheltersAdmintry) // Route to get all shelters by id
-	//app.Put("/admin/shelters/:id/approve", controllers.ApproveShelterRegStatus)
 
 	// =====================
 	// Public Routes (No Auth Required)
@@ -50,12 +47,13 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Get("/users/priority/", controllers.GetPetsWithTrueStatus)
 	pethubRoutes.Get("/users/allpets", controllers.GetAllPets)
 	pethubRoutes.Get("/users/pets/search/all", controllers.FetchAllPets)
-	pethubRoutes.Get("/applications/adopter/:adopter_id", controllers.GetApplicationByAdopterID)
+	pethubRoutes.Get("/applications/adopter/:application_id", controllers.GetApplicationByAdopterID)
 	pethubRoutes.Get("/applications/pet/:pet_id", controllers.GetAdoptionApplicationsByPetID2)
 	pethubRoutes.Get("/applications/status/:application_id", controllers.GetAdoptionSubmissionStatusByApplicationID)
 	pethubRoutes.Post("/reports/shelter/:shelter_id/adopter/:adopter_id", controllers.SubmitReport)
 	pethubRoutes.Get("/applications/allpets/:adopter_id", controllers.ShowPetsByAdopterID)
 	pethubRoutes.Get("/adopter/:adopter_id/notifications", controllers.GetAdoptionNotifications)
+	app.Get("/check_application", controllers.CheckApplicationExists)
 	pethubRoutes.Get("/adopter/:adopter_id/notifications/unread_count", controllers.CountUnreadNotifications)
 	pethubRoutes.Patch("/adopter/notifications/:id/read-status", controllers.SetNotificationReadStatus)
 	pethubRoutes.Get("/adopter/notifications/:id", controllers.GetNotificationByID)
@@ -84,7 +82,6 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Get("/shelterinfo/:shelter_id", controllers.GetShelterInfo)
 	pethubRoutes.Post("/shelter/:shelter_id/add-pet", controllers.AddPetInfo)
 	pethubRoutes.Get("/shelter/count/:pet_id/applied", controllers.CountApplicantsByPetId)
-
 	pethubRoutes.Get("/shelter/:shelter_id/adoption", controllers.GetPetsWithAdoptionRequestsByShelter)
 	pethubRoutes.Get("/shelter/:pet_id/get/applications", controllers.GetAdoptionApplicationsByPetID)
 	pethubRoutes.Post("/shelter/application/:application_id/set-interview-date", controllers.SetInterviewSchedule)
@@ -92,6 +89,7 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Get("/shelter/:shelter_id/adoption-applications", controllers.GetAdoptionSubmissionsByShelterAndStatus)
 	pethubRoutes.Post("/shelter/reject-application/:application_id", controllers.RejectApplication)
 	pethubRoutes.Put("/shelter/approve-application/:application_id", controllers.ApproveApplication)
+	pethubRoutes.Get("/shelter/export/:shelter_id/:application_id/letter", controllers.GetInfosForDownloadLetter)
 
 	// ---------------- General Shared Routes ----------------s
 	pethubRoutes.Get("/allshelter", controllers.GetShelters)
