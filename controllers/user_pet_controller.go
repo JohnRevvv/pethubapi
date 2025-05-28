@@ -680,11 +680,14 @@ func ShowPetsByAdopterID(c *fiber.Ctx) error {
 	}
 
 	type AdoptedListResponse struct {
-		ApplicationID uint   `json:"application_id"`
-		PetImage      string `json:"pet_image1"`
-		PetName       string `json:"pet_name"`
-		ShelterName   string `json:"shelter_name"`
-		Status        string `json:"status"`
+		ApplicationID       uint   `json:"application_id"`
+		PetImage            string `json:"pet_image1"`
+		PetName             string `json:"pet_name"`
+		ShelterName         string `json:"shelter_name"`
+		Status              string `json:"status"`
+		InterviewDate       string `json:"interview_date,omitempty"`
+		InterviewTime       string `json:"interview_time,omitempty"`
+		InterviewNotes string `json:"interview_notes,omitempty"`
 	}
 
 	var submissions []models.AdoptionSubmission
@@ -722,13 +725,27 @@ func ShowPetsByAdopterID(c *fiber.Ctx) error {
 			shelter.ShelterName = ""
 		}
 
-		results = append(results, AdoptedListResponse{
+		response := AdoptedListResponse{
 			ApplicationID: submission.ApplicationID,
 			PetImage:      petMedia.PetImage1,
 			PetName:       pet.PetName,
 			ShelterName:   shelter.ShelterName,
 			Status:        submission.Status,
-		})
+		}
+
+		// If status is Interview, fetch schedule info
+		if submission.Status == "Interview" {
+			var interview models.ScheduleInterview
+			if err := middleware.DBConn.
+				Where("application_id = ?", submission.ApplicationID).
+				First(&interview).Error; err == nil {
+				response.InterviewDate = interview.InterviewDate.Format("2006-01-02") // format date as yyyy-mm-dd
+				response.InterviewTime = interview.InterviewTime
+				response.InterviewNotes = interview.InterviewNotes
+			}
+		}
+
+		results = append(results, response)
 	}
 
 	return c.JSON(fiber.Map{
