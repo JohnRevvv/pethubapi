@@ -747,7 +747,6 @@ func CheckApplicationExists(c *fiber.Ctx) error {
 		})
 	}
 
-	// Convert to uint
 	petId, err := strconv.ParseUint(petIdStr, 10, 32)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -762,7 +761,6 @@ func CheckApplicationExists(c *fiber.Ctx) error {
 		})
 	}
 
-	// Query all submissions
 	var submissions []models.AdoptionSubmission
 	result := middleware.DBConn.Find(&submissions)
 	if result.Error != nil {
@@ -776,15 +774,23 @@ func CheckApplicationExists(c *fiber.Ctx) error {
 	petAndAdopterMatch := false
 	var matchedApplicationID uint = 0
 
+	rejectedStatuses := map[string]bool{
+		"application_reject": true,
+		"interview_reject":   true,
+		"approved_reject":    true,
+	}
+
 	for _, submission := range submissions {
 		if submission.PetID == uint(petId) {
 			petExists = true
 		}
 		if submission.AdopterID == uint(adopterId) {
-			adopterExists = true
-			if submission.PetID == uint(petId) {
-				petAndAdopterMatch = true
-				matchedApplicationID = submission.ApplicationID
+			if !rejectedStatuses[submission.Status] {
+				adopterExists = true
+				if submission.PetID == uint(petId) {
+					petAndAdopterMatch = true
+					matchedApplicationID = submission.ApplicationID
+				}
 			}
 		}
 	}
@@ -794,6 +800,6 @@ func CheckApplicationExists(c *fiber.Ctx) error {
 		"adopter_exists":  adopterExists,
 		"pet_and_adopter": petAndAdopterMatch,
 		"application_id":  matchedApplicationID,
-		"all_submissions": submissions,
 	})
+
 }
