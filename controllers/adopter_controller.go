@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	"pethub_api/middleware"
@@ -709,21 +710,126 @@ func UploadAdopterMedia(c *fiber.Ctx) error {
 	})
 }
 
-func GetAdopterProfile(c *fiber.Ctx) error {
-	adopterID := c.Params("id")
-
-	var adopter models.AdopterInfo
-	var profile models.AdopterMedia
-
-	if err := middleware.DBConn.Where("adopter_id = ?", adopterID).First(&adopter).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Adopter not found"})
+func GetAdoptionNotifications(c *fiber.Ctx) error {
+	adopterIDStr := c.Params("adopter_id")
+	adopterID, err := strconv.Atoi(adopterIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid adopter ID",
+		})
 	}
 
-	middleware.DBConn.Where("adopter_id = ?", adopterID).First(&profile)
+	// Step 1: Fetch all applications for this adopter
+	var applications []models.AdoptionSubmission
+	if err := middleware.DBConn.Preload("Pet").
+		Where("adopter_id = ?", adopterID).
+		Order("created_at DESC").
+		Find(&applications).Error; err != nil {
+		log.Println("Error fetching applications:", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch adoption applications",
+		})
+	}
+
+	// Step 2: Generate notification if needed
+	for _, app := range applications {
+		var notifType, notifStatus, notifCategory, notifTitle string
+
+		if app.Status == "application_reject" || app.Status == "interview_reject" || app.Status == "approved_reject" {
+			notifType = "rejected"
+			notifStatus = "rejected"
+			notifCategory = "rejected"
+			switch app.Status {
+			case "application_reject":
+				notifTitle = "Application Rejected"
+			case "interview_reject":
+				notifTitle = "Interview Rejected"
+			case "approved_reject":
+				notifTitle = "Approval Rejected"
+			}
+		} else {
+			switch app.Status {
+			case "pending":
+				notifType = "application"
+				notifStatus = "pending"
+				notifCategory = "inprogress"
+				notifTitle = "Application Pending"
+			case "in queue":
+				notifType = "application"
+				notifStatus = "in queue"
+				notifCategory = "inprogress"
+				notifTitle = "Application In Queue"
+			case "interview":
+				notifType = "interview"
+				notifStatus = "interview"
+				notifCategory = "inprogress"
+				notifTitle = "Interview Scheduled"
+			case "approved":
+				notifType = "approved"
+				notifStatus = "approved"
+				notifCategory = "approved"
+				notifTitle = "Application Approved"
+			case "completed":
+				notifType = "completed"
+				notifStatus = "completed"
+				notifCategory = "completed"
+				notifTitle = "Adoption Completed"
+			default:
+				notifType = "application"
+				notifStatus = app.Status
+				notifCategory = "inprogress"
+				notifTitle = "Application Update"
+			}
+		}
+
+		message := fmt.Sprintf("Your adoption application for %s is now '%s'.", app.Pet.PetName, strings.Title(app.Status))
+
+		// Check if notification already exists (no deleted filter)
+		var existingNotif models.Notification
+		err := middleware.DBConn.
+			Where("adopter_id = ? AND pet_id = ? AND status = ?",
+				adopterID, app.PetID, notifStatus).
+			First(&existingNotif).Error
+
+		if err == nil {
+			continue // Notification already exists
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Println("Error checking existing notification:", err)
+			continue
+		}
+
+		// Create new notification
+		notif := models.Notification{
+			AdopterID: uint(adopterID),
+			PetID:     uint(app.PetID),
+			Title:     notifTitle,
+			Message:   message,
+			Type:      notifType,
+			Status:    notifStatus,
+			Category:  notifCategory,
+			IsRead:    false,
+			CreatedAt: time.Now(),
+		}
+
+		if err := middleware.DBConn.Create(&notif).Error; err != nil {
+			log.Println("Error creating notification:", err)
+		}
+	}
+
+	// Step 3: Return all notifications for this adopter (no deleted filter)
+	var notifications []models.Notification
+	if err := middleware.DBConn.
+		Where("adopter_id = ?", adopterID).
+		Order("created_at DESC").
+		Find(&notifications).Error; err != nil {
+		log.Println("Error fetching notifications:", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch notifications",
+		})
+	}
 
 	return c.JSON(fiber.Map{
-		"adopter":         adopter,
-		"adopter_profile": profile.AdopterProfile,
+		"notifications": notifications,
 	})
 }
 
@@ -835,64 +941,6 @@ func EditAdopterProfile(c *fiber.Ctx) error {
 		Data:    adopterInfo,
 	})
 }
-func GetAdoptionNotifications(c *fiber.Ctx) error {
-	adopterID := c.Params("adopter_id")
-
-	// Step 1: Fetch adoption applications for this adopter
-	var applications []models.AdoptionSubmission
-	if err := middleware.DBConn.Preload("Pet").Where("adopter_id = ?", adopterID).Order("created_at DESC").Find(&applications).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to fetch adoption applications",
-		})
-	}
-
-	// Step 2: For each application, create a new notification if needed (e.g., new status)
-	for _, app := range applications {
-		// Compose notification message
-		msg := fmt.Sprintf("Your adoption application for %s is now '%s'.", app.Pet.PetName, app.Status)
-
-		// Check if a notification for this adopter, pet, and status already exists
-		var existingNotif models.Notification
-		err := middleware.DBConn.
-			Where("adopter_id = ? AND status = ? AND message = ?", app.AdopterID, app.Status, msg).
-			First(&existingNotif).Error
-		if err == nil {
-			// Notification already exists, skip creating a new one
-			continue
-		}
-
-		// Create a new notification record
-		newNotification := models.Notification{
-			AdopterID: app.AdopterID,
-			Title:     "Adoption Application Update",
-			Message:   msg,
-			Type:      "adoption_status",
-			Status:    app.Status,
-			IsRead:    false,
-			CreatedAt: app.CreatedAt,
-		}
-
-		// Save the notification, log error but continue
-		if err := middleware.DBConn.Create(&newNotification).Error; err != nil {
-			log.Println("Error creating notification:", err)
-		}
-	}
-
-	// Step 3: Fetch all notifications for the adopter to return
-	var notifications []models.Notification
-	if err := middleware.DBConn.
-		Where("adopter_id = ?", adopterID).
-		Order("created_at DESC").
-		Find(&notifications).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to fetch notifications",
-		})
-	}
-
-	return c.JSON(fiber.Map{
-		"notifications": notifications,
-	})
-}
 
 func SetNotificationReadStatus(c *fiber.Ctx) error {
 	notificationID := c.Params("id")
@@ -971,16 +1019,43 @@ func GetNotificationByID(c *fiber.Ctx) error {
 	})
 }
 
-func DeleteNotification(c *fiber.Ctx) error {
-	notificationID := c.Params("id")
+func GetAdopterProfile(c *fiber.Ctx) error {
+	adopterID := c.Params("id")
 
-	if err := middleware.DBConn.Delete(&models.Notification{}, notificationID).Error; err != nil {
+	var adopter models.AdopterInfo
+	var profile models.AdopterMedia
+
+	if err := middleware.DBConn.Where("adopter_id = ?", adopterID).First(&adopter).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Adopter not found"})
+	}
+
+	middleware.DBConn.Where("adopter_id = ?", adopterID).First(&profile)
+
+	return c.JSON(fiber.Map{
+		"adopter":         adopter,
+		"adopter_profile": profile.AdopterProfile,
+	})
+}
+
+func DeleteAllNotifications(c *fiber.Ctx) error {
+	adopterIDStr := c.Params("adopter_id")
+	adopterID, err := strconv.Atoi(adopterIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid adopter ID",
+		})
+	}
+
+	// Hard delete all notifications for this adopter
+	if err := middleware.DBConn.
+		Where("adopter_id = ?", adopterID).
+		Delete(&models.Notification{}).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to delete notification",
+			"error": "Failed to delete notifications",
 		})
 	}
 
 	return c.JSON(fiber.Map{
-		"message": "Notification deleted successfully",
+		"message": "All notifications deleted successfully",
 	})
 }

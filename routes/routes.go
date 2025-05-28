@@ -57,7 +57,7 @@ func AppRoutes(app *fiber.App) {
 	pethubRoutes.Get("/adopter/:adopter_id/notifications/unread_count", controllers.CountUnreadNotifications)
 	pethubRoutes.Patch("/adopter/notifications/:id/read-status", controllers.SetNotificationReadStatus)
 	pethubRoutes.Get("/adopter/notifications/:id", controllers.GetNotificationByID)
-	pethubRoutes.Delete("/adopter/notifications/:id/remove", controllers.DeleteNotification)
+	pethubRoutes.Delete("/adopter/:adopter_id/notifications/remove_all", controllers.DeleteAllNotifications)
 	// ---------------- Shelter Routes ----------------
 	app.Post("/shelter/register", controllers.RegisterShelter)
 	app.Post("/shelter/login", controllers.LoginShelter)
