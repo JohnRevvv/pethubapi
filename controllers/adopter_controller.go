@@ -731,6 +731,13 @@ func GetAdoptionNotifications(c *fiber.Ctx) error {
 		})
 	}
 
+	// Adjustment: If no applications, return empty notifications
+	if len(applications) == 0 {
+		return c.JSON(fiber.Map{
+			"notifications": []models.Notification{},
+		})
+	}
+
 	// Step 2: Generate notification if needed
 	for _, app := range applications {
 		var notifType, notifStatus, notifCategory, notifTitle string
